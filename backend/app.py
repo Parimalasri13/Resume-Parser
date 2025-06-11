@@ -119,9 +119,9 @@ def extract_resume_json(resume_text, source_name=""):
     
 
 def parse_ranking_result(text: str) -> Tuple[Optional[int], str, Optional[str], Optional[str]]:
-    """Parse ranking result to extract score, reason, phone, and email"""
+    """Parse ranking result to extract score, remarks, phone, and email"""
     score = None
-    reason = text
+    remarks = text
     email = None
     phone = None
     
@@ -140,7 +140,7 @@ def parse_ranking_result(text: str) -> Tuple[Optional[int], str, Optional[str], 
     phone_match = re.search(r"phone\s*[:\-]?\s*([\+\d][\d\s\-\(\)]{7,}\d)", text, re.IGNORECASE)
     if phone_match:
         phone = phone_match.group(1).strip()
-    # Extract reason (text after score line)
+    # Extract remarks (text after score line)
     if score_match:
         parts = text.split('\n')
         reason_lines = []
@@ -152,14 +152,14 @@ def parse_ranking_result(text: str) -> Tuple[Optional[int], str, Optional[str], 
             if found_score_line:
                 reason_lines.append(line.strip())
         if reason_lines:
-            reason = " ".join(reason_lines).strip()
-    return score, reason, phone, email
+            remarks = " ".join(reason_lines).strip()
+    return score, remarks, phone, email
 
 
 def rank_resume(job_description: str, resume_json: Dict) -> str:
     """Rank a resume against a job description"""
     prompt = f"""
-You are an expert resume screener. Given a Job Description and a candidate's resume in JSON format, analyze and provide a match score out of 100 along with reason.
+You are an expert resume screener. Given a Job Description and a candidate's resume in JSON format, analyze and provide a match score out of 100 along with remarks.
 
 ### Job Description:
 {job_description}
@@ -169,7 +169,7 @@ You are an expert resume screener. Given a Job Description and a candidate's res
 
 Now give:
 1. A match score (0-100) indicating how well the resume fits the job.
-2. A short reason for the score.
+2. A short remarks for the score.
 3. Email address of the candidate if available.
 4. Phone number of the candidate if available.
     """
@@ -239,13 +239,19 @@ def process_resumes_from_db(job_description: str) -> List[Dict]:
         resume_json = resume.get("parsed_data")
         print(f"\nProcessing resume: {filename}")
         if resume_json:
+            start_index = resume_json.find('{')
+            end_index = resume_json.rfind('}')+1
+            json_text = resume_json[start_index:end_index]
+            resume_json = json_text.encode().decode('unicode_escape')  # handles \n, \"
             ranking_text = rank_resume(job_description, resume_json)
-            score, reason, phone, email = parse_ranking_result(ranking_text)
+            print(f"Ranking result for {filename}:", ranking_text)
+            resume_response = parse_ranking_result(ranking_text)
+            score, remarks, phone, email = resume_response
             result = {
                 "resume_id": resume["_id"],
                 "filename": filename,
-                "match_score": score if score is not None else "N/A",
-                "reason": reason,
+                "score": score if score is not None else "N/A",
+                "remarks": remarks,
                 "phone": phone,
                 "email": email
             }
@@ -291,9 +297,7 @@ def upload_resume():
         if not resume_id:
             return jsonify({"error": "Failed to store resume in database"}), 500
         return jsonify({
-            "message": "Resume uploaded and processed successfully",
-            "resume_id": resume_id,
-            "filename": file.filename
+            "message": "Resume uploaded successfully",
         })
     except Exception as e:
         return jsonify({"error": f"Upload failed: {str(e)}"}), 500
@@ -326,11 +330,11 @@ def get_ranking_results():
         rankings_response = []
         for ranking in all_rankings:
             results = ranking.get("results", [])
-            # Sort each ranking's results by match_score
+            # Sort each ranking's results by score
             try:
                 sorted_results = sorted(
                     results,
-                    key=lambda x: float(x["match_score"]) if x["match_score"] != "N/A" else -1,
+                    key=lambda x: float(x["score"]) if x["score"] != "N/A" else -1,
                     reverse=True
                 )
             except:
@@ -361,7 +365,7 @@ def process_resumes():
         results = process_resumes_from_db(job_description)
         sorted_results = sorted(
                     results,
-                    key=lambda x: float(x["match_score"]) if x["match_score"] != "N/A" else -1,
+                    key=lambda x: float(x["score"]) if x["score"] != "N/A" else -1,
                     reverse=True
                 )
         num_processed = len(sorted_results)

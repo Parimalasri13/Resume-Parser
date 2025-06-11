@@ -1,16 +1,16 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 function UploadResume() {
+  const BASE_URL = process.env.REACT_APP_SERVER_URL;
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
-  const [uploadResult, setUploadResult] = useState(null);
+  const fileInputRef = useRef(null);
 
   const handleFileChange = (e) => {
     setSelectedFile(e.target.files[0]);
-    setUploadResult(null);
   };
 
   const handleUpload = async () => {
@@ -24,20 +24,22 @@ function UploadResume() {
 
     try {
       setUploading(true);
-      const res = await axios.post("http://localhost:5000/upload_resume", formData, {
+      const res = await axios.post(`${BASE_URL}/upload_resume`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
       });
 
-      toast.success("Resume uploaded successfully!");
-      setUploadResult(res.data);
+      toast.success(res.data.message);
       setSelectedFile(null);
+      // Clear file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = null;
+      }
     } catch (error) {
       const errorMessage =
         error?.response?.data?.error || "Upload failed. Please try again.";
       toast.error(errorMessage);
-      setUploadResult(null);
     } finally {
       setUploading(false);
     }
@@ -67,6 +69,7 @@ function UploadResume() {
         </h2>
 
         <input
+          ref={fileInputRef}
           type="file"
           accept=".pdf"
           onChange={handleFileChange}
@@ -89,7 +92,7 @@ function UploadResume() {
             fontSize: "16px",
             border: "none",
             cursor: uploading ? "not-allowed" : "pointer",
-            opacity: uploading ? 0.5 : 1
+            opacity: uploading ? 0.5 : 1,
           }}
         >
           {uploading ? "Uploading..." : "Upload"}

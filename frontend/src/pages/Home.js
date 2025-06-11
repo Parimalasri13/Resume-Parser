@@ -1,66 +1,72 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
+import { Typewriter } from "react-simple-typewriter";
 import "react-toastify/dist/ReactToastify.css";
 import "../App.css";
 
 function App() {
+  const BASE_URL = process.env.REACT_APP_SERVER_URL;
   const [loading, setLoading] = useState(false);
   const [job_Description, setJobDescription] = useState("");
-  const [response, setResponse] = useState("");
   const [tableData, setTableData] = useState([]);
   const [tableError, setTableError] = useState("");
   const [showTable, setShowTable] = useState(false);
 
-  const formatReasoning = (text) => {
-    const entries = [];
-    const pattern = /\*\*(.*?)\*\*:? ?(.*?)(?=(\*\*.*?\*\*|$))/gs;
-    let match;
-    let matchedIndices = [];
+  // const formatReasoning = (text) => {
+  //   const entries = [];
+  //   const pattern = /\*\*(.*?)\*\*:? ?(.*?)(?=(\*\*.*?\*\*|$))/gs;
+  //   let match;
+  //   let matchedIndices = [];
 
-    while ((match = pattern.exec(text)) !== null) {
-      const key = match[1].trim();
-      const value = match[2].trim();
-      entries.push({ key, value });
-      matchedIndices.push([match.index, pattern.lastIndex]);
-    }
+  //   while ((match = pattern.exec(text)) !== null) {
+  //     const key = match[1].trim();
+  //     const value = match[2].trim();
+  //     entries.push({ key, value });
+  //     matchedIndices.push([match.index, pattern.lastIndex]);
+  //   }
 
-    let remainingText = text;
-    matchedIndices.reverse().forEach(([start, end]) => {
-      remainingText =
-        remainingText.slice(0, start) + " ".repeat(end - start) + remainingText.slice(end);
-    });
+  //   let remainingText = text;
+  //   matchedIndices.reverse().forEach(([start, end]) => {
+  //     remainingText =
+  //       remainingText.slice(0, start) +
+  //       " ".repeat(end - start) +
+  //       remainingText.slice(end);
+  //   });
 
-    const extraText = remainingText
-      .trim()
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line);
+  //   const extraText = remainingText
+  //     .trim()
+  //     .split("\n")
+  //     .map((line) => line.trim())
+  //     .filter((line) => line);
 
-    extraText.forEach((line) => {
-      if (line) {
-        entries.push({ key: "Note", value: line });
-      }
-    });
+  //   extraText.forEach((line) => {
+  //     if (line) {
+  //       entries.push({ key: "Note", value: line });
+  //     }
+  //   });
 
-    return entries;
-  };
+  //   return entries;
+  // };
 
   const handleSubmit = async () => {
     setLoading(true);
-    setResponse("");
     setTableData([]);
     setShowTable(false);
+    if (job_Description.trim() === "") {
+      toast.error("Please enter a job description.");
+      setLoading(false);
+      return;
+    }
     try {
       toast.info("Sending job description...");
       const res = await axios.post(
-        "http://localhost:5000/process_resumes",
+        `${BASE_URL}/process_resumes`,
         { job_Description },
         { headers: { "Content-Type": "application/json" } }
       );
 
-      const { count, message, results } = res.data;
-      setResponse(`✅ ${message}`);
+      const { count, results } = res.data;
       toast.success(`${count} resumes processed!`);
 
       if (results && results.length > 0) {
@@ -73,7 +79,6 @@ function App() {
     } catch (error) {
       console.error("Submission failed:", error);
       toast.error("Error processing resumes.");
-      setResponse("Something went wrong. Please try again.");
       setShowTable(false);
     } finally {
       setLoading(false);
@@ -112,7 +117,9 @@ function App() {
       >
         {/* Form */}
         <div style={{ flex: "1 1 400px", minWidth: "300px" }}>
-          <h2 style={{ color: "#2c3e50", marginBottom: "20px" }}>Enter Job Description</h2>
+          <h2 style={{ color: "#2c3e50", marginBottom: "20px" }}>
+            Enter Job Description
+          </h2>
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
             <input
               type="text"
@@ -164,13 +171,35 @@ function App() {
       </div>
       {/* Loading Indicator */}
       {loading && (
-        <div style={{ textAlign: "center", margin: "50px 0" }}>
-          <div className="spinner" />
-          <p style={{ marginTop: "10px", color: "#2c3e50" }}>Processing resumes ...</p>
+        <div
+          style={{
+            textAlign: "center",
+            margin: "80px 0",
+            fontSize: "24px",
+            fontWeight: "bold",
+            color: "#2c3e50",
+          }}
+        >
+          <Typewriter
+            words={[
+              "Initializing",
+              "Parsing Resume",
+              "Standby Mode: Active Learning",
+              "Ingesting new data streams...",
+              "Our AI system is adapting, evolving, every moment.",
+              "Knowledge base expanded. Ready for next query.",
+            ]}
+            loop={0}
+            cursor
+            cursorStyle="|"
+            typeSpeed={100} // slow typing
+            deleteSpeed={30} // slow deleting
+            delaySpeed={1500} // pause between messages
+          />
         </div>
       )}
 
-      {/* CSV Table Section */}
+      {/* Results Table Section */}
       {showTable && (
         <div
           style={{
@@ -182,7 +211,9 @@ function App() {
             boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
           }}
         >
-          <h2 style={{ color: "#2c3e50", marginBottom: "20px" }}>Processed Resume Results</h2>
+          <h2 style={{ color: "#2c3e50", marginBottom: "20px" }}>
+            Processed Resume Results
+          </h2>
 
           {tableError && <p style={{ color: "red" }}>{tableError}</p>}
 
@@ -219,7 +250,6 @@ function App() {
               </thead>
               <tbody>
                 {tableData.map((row, idx) => {
-                  const parsedReasoning = formatReasoning(row.reason || "");
                   return (
                     <tr
                       key={idx}
@@ -231,6 +261,7 @@ function App() {
                       <td style={tdStyle}>
                         <div
                           style={{
+                            position: "relative", // make container a positioning context
                             background: "#e0e0e0",
                             borderRadius: "10px",
                             overflow: "hidden",
@@ -240,31 +271,45 @@ function App() {
                         >
                           <div
                             style={{
-                              width: `${row.match_score || 0}%`,
+                              width: `${row.score || 0}%`,
                               background:
-                                row.match_score >= 75
+                                row.score >= 75
                                   ? "#27ae60"
-                                  : row.match_score >= 50
+                                  : row.score >= 50
                                   ? "#f39c12"
                                   : "#e74c3c",
                               height: "100%",
-                              textAlign: "center",
-                              color: "white",
+                            }}
+                          ></div>
+
+                          {/* Centered text */}
+                          <div
+                            style={{
+                              position: "absolute",
+                              top: 0,
+                              left: 0,
+                              height: "100%",
+                              width: "100%",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              color: "#2c3e50",
                               fontWeight: "bold",
                             }}
                           >
-                            {row.match_score}%
+                            {row.score}%
                           </div>
                         </div>
                       </td>
                       <td style={{ ...tdStyle, whiteSpace: "pre-wrap" }}>
-                        <div style={{ textAlign: "left" }}>
-                          {parsedReasoning.map(({ key, value }, i) => (
+                        {/* <div style={{ textAlign: "left" }}>
+                          {row.reason.map(({ key, value }, i) => (
                             <p key={i} style={{ marginBottom: "6px" }}>
                               <strong>{key}:</strong> {value}
                             </p>
                           ))}
-                        </div>
+                        </div> */}
+                        {row.remarks}
                       </td>
                     </tr>
                   );
@@ -274,7 +319,11 @@ function App() {
           </div>
         </div>
       )}
-      <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} />
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+      />
     </div>
   );
 }
