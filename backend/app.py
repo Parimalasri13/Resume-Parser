@@ -1,4 +1,5 @@
 import os
+import random
 import re
 import json
 import time
@@ -47,23 +48,40 @@ except Exception as e:
     client = None
 
 
-def post_with_retries(url: str, headers: Dict, payload: Dict, retries: int = 5, backoff_factor: int = 2) -> requests.Response:
+def post_with_retries(url: str, headers: Dict, payload: Dict) -> requests.Response:
     """Make API request with exponential backoff retry logic"""
-    delay = 2
-    
-    for attempt in range(retries):
+    base_delay = 1.0
+    max_delay = 30.0
+    post_success_sleep = 10.0
+    delay = base_delay
+    retries = 5
+    backoff_factor = 2
+
+    for attempt in range(1, retries + 1):
         try:
-            response = requests.post(url, headers=headers, json=payload)
+            response = requests.post(url, headers=headers, json=payload, timeout=30)
             response.raise_for_status()
+            # Success delay
+            time.sleep(random.uniform(0, post_success_sleep))
             return response
-        except requests.exceptions.HTTPError as e:
-            if response.status_code == 429:
-                print(f"Rate limit hit. Retrying in {delay}s... (Attempt {attempt + 1}/{retries})")
-                time.sleep(delay)
-                delay *= backoff_factor
-            else:
-                raise e
-    raise Exception("Exceeded retry limit due to repeated 429 errors")
+        except requests.exceptions.HTTPError as http_err:
+            status = getattr(http_err.response, "status_code", None)
+            if status == 429:
+                # Exponential backoff with jitter
+                sleep_time = min(max_delay, delay * backoff_factor)
+                jitter = random.uniform(0, sleep_time * 0.1)
+                print(f"[429] Rate limit hit. Retrying in {sleep_time + jitter:.2f}s (Attempt {attempt}/{retries})")
+                time.sleep(sleep_time + jitter)
+                delay = sleep_time
+                continue
+            raise
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as conn_err:
+            # Retry on transient errors
+            jitter = random.uniform(0, delay * 0.1)
+            print(f"[Retryable] {type(conn_err).__name__} on attempt {attempt}, retrying in {delay + jitter:.2f}s")
+            time.sleep(delay + jitter)
+            delay = min(max_delay, delay * 2)
+    raise RuntimeError(f"Failed after {retries} attempts: {url}")
 
 
 def extract_text_from_pdf_bytes(pdf_bytes: bytes) -> Optional[str]:
@@ -84,15 +102,18 @@ def extract_text_from_pdf_bytes(pdf_bytes: bytes) -> Optional[str]:
 
 
 def extract_resume_json(resume_text, source_name=""):
+    system_msg = (
+        "You are a resume-parsing assistant. Respond ONLY with a single, "
+        "strictly valid JSON object with these keys: "
+        '"contactInfo", "education", "experience", "projects", "technicalSkills", '
+        '"certifications", "extraCurriculars", "achievements". '
+        "Do NOT include any markdown, commentary, or trailing commas."
+    )
+    user_msg = f"Parse the following resume text into JSON:\n\n{resume_text}"
+
     messages = [
-        {
-            "role": "system",
-            "content": "You are an intelligent assistant that extracts structured information from resumes. Return only valid JSON."
-        },
-        {
-            "role": "user",
-            "content": f"Extract structured information from the following resume text and return it as a JSON object:\n\n{resume_text}"
-        }
+        {"role": "system", "content": system_msg},
+        {"role": "user",   "content": user_msg}
     ]
 
     payload = {
@@ -118,60 +139,33 @@ def extract_resume_json(resume_text, source_name=""):
         return None
     
 
-def parse_ranking_result(text: str) -> Tuple[Optional[int], str, Optional[str], Optional[str]]:
-    """Parse ranking result to extract score, remarks, phone, and email"""
-    score = None
-    remarks = text
-    email = None
-    phone = None
-    
-    # Extract score (0-100)
-    score_match = re.search(r"score\s*[:\-]?\s*(\d{1,3})", text, re.IGNORECASE)
-    if score_match:
-        potential_score = int(score_match.group(1))
-        if potential_score <= 100:
-            score = potential_score
-    # Extract email
-    email_match = re.search(r"email\s*[:\-]?\s*([\w\.-]+@[\w\.-]+\.\w+)", text, re.IGNORECASE)
-    if email_match:
-        email = email_match.group(1)
-
-    # Extract phone
-    phone_match = re.search(r"phone\s*[:\-]?\s*([\+\d][\d\s\-\(\)]{7,}\d)", text, re.IGNORECASE)
-    if phone_match:
-        phone = phone_match.group(1).strip()
-    # Extract remarks (text after score line)
-    if score_match:
-        parts = text.split('\n')
-        reason_lines = []
-        found_score_line = False
-        for line in parts:
-            if score_match.group(0).lower() in line.lower():
-                found_score_line = True
-                continue
-            if found_score_line:
-                reason_lines.append(line.strip())
-        if reason_lines:
-            remarks = " ".join(reason_lines).strip()
-    return score, remarks, phone, email
-
-
 def rank_resume(job_description: str, resume_json: Dict) -> str:
     """Rank a resume against a job description"""
     prompt = f"""
-You are an expert resume screener. Given a Job Description and a candidate's resume in JSON format, analyze and provide a match score out of 100 along with remarks.
+    You are an expert resume screener. Given a Job Description and a candidate's resume in proper valid JSON format, analyze and return a structured, proper valid JSON object containing:
 
-### Job Description:
-{job_description}
+    - A match score (0–100) indicating how well the resume fits the job.
+    - A short remark explaining the score.
+    - The email address of the candidate if available.
+    - The phone number of the candidate if available.
+    - The experience of the candidate in years if available
 
-### Resume JSON:
-{json.dumps(resume_json, indent=2)}
+    Please respond **only** with a single, valid JSON object—no additional text—using exactly this structure (all braces, quotes, commas, and colons must be present and correctly placed):
+    {{
+    "score": <integer or float>,
+    "remarks": "<detailed text>",
+    "email": "<email address or empty string>",
+    "phone": "<phone number or empty string>",
+    "experience":<integer or float>
+    }}
 
-Now give:
-1. A match score (0-100) indicating how well the resume fits the job.
-2. A short remarks for the score.
-3. Email address of the candidate if available.
-4. Phone number of the candidate if available.
+    job description and resume json are attached below
+
+    ### Job Description:
+    {job_description}
+
+    ### Resume JSON:
+    {json.dumps(resume_json, indent=2)}
     """
 
     messages = [
@@ -235,30 +229,38 @@ def process_resumes_from_db(job_description: str) -> List[Dict]:
         print("No resumes found in database")
         return results
     for resume in resumes:
-        filename = resume.get("filename", "Unknown")
-        resume_json = resume.get("parsed_data")
-        print(f"\nProcessing resume: {filename}")
-        if resume_json:
-            start_index = resume_json.find('{')
-            end_index = resume_json.rfind('}')+1
-            json_text = resume_json[start_index:end_index]
-            resume_json = json_text.encode().decode('unicode_escape')  # handles \n, \"
-            ranking_text = rank_resume(job_description, resume_json)
-            print(f"Ranking result for {filename}:", ranking_text)
-            resume_response = parse_ranking_result(ranking_text)
-            score, remarks, phone, email = resume_response
-            result = {
-                "resume_id": resume["_id"],
-                "filename": filename,
-                "score": score if score is not None else "N/A",
-                "remarks": remarks,
-                "phone": phone,
-                "email": email
-            }
-            results.append(result)
-        else:
-            print(f"Skipping resume due to missing parsed data: {filename}")
-
+        try:
+            filename = resume.get("filename", "Unknown")
+            resume_json = str(resume.get("parsed_data"))
+            print(f"Processing resume: {filename}")
+            if resume_json:
+                start_index = resume_json.find('{')
+                end_index = resume_json.rfind('}')+1
+                resume_json = resume_json[start_index:end_index]
+                # resume_json = json_text.encode().decode('unicode_escape')  # handles \n, \"
+                ranking_text = rank_resume(job_description, resume_json)
+                # resume_response = parse_ranking_result(ranking_text)
+                # score, remarks, phone, email = resume_response
+                resume_response = json.loads(ranking_text)
+                score = resume_response.get("score")
+                remarks = resume_response.get("remarks")    
+                phone = resume_response.get("phone")    
+                email = resume_response.get("email")
+                experience = resume_response.get("experience")
+                result = {
+                    "resume_id": resume["_id"],
+                    "filename":filename, 
+                    "score": score if score is not None else -1,
+                    "remarks":remarks,
+                    "phone":phone,
+                    "email":email,
+                    "experience":experience
+                }
+                results.append(result)
+            else:
+                print(f"Skipping resume due to missing parsed data: {filename}")
+        except Exception as e:
+            print(f"Error processing resume {filename}: {e}")
     if results:
         # Store ranking results in database
         ranking_doc = {
@@ -334,7 +336,7 @@ def get_ranking_results():
             try:
                 sorted_results = sorted(
                     results,
-                    key=lambda x: float(x["score"]) if x["score"] != "N/A" else -1,
+                    key=lambda x: x["score"],
                     reverse=True
                 )
             except:
@@ -365,7 +367,7 @@ def process_resumes():
         results = process_resumes_from_db(job_description)
         sorted_results = sorted(
                     results,
-                    key=lambda x: float(x["score"]) if x["score"] != "N/A" else -1,
+                    key=lambda x: x["score"],
                     reverse=True
                 )
         num_processed = len(sorted_results)
