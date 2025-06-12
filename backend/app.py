@@ -1,9 +1,8 @@
 import os
 import random
-import re
 import json
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from datetime import datetime
 
 import fitz  # PyMuPDF
@@ -15,7 +14,14 @@ from flask_cors import CORS
 from pymongo import MongoClient
 from bson import ObjectId
 import gridfs
-import io
+from flask import Response
+import threading
+
+# Global variable to store progress messages
+progress_messages = []
+
+# Lock for thread-safe access
+progress_lock = threading.Lock()
 
 # Load environment variables
 load_dotenv()
@@ -222,58 +228,63 @@ def get_all_resumes_from_db() -> List[Dict]:
 
 
 def process_resumes_from_db(job_description: str) -> List[Dict]:
-    """Process all resumes from MongoDB and rank them"""
     results = []
     resumes = get_all_resumes_from_db()
     if not resumes:
-        print("No resumes found in database")
+        send_progress(json.dumps({"status":"complete","message":"No resumes found in the database."}))
         return results
     for resume in resumes:
         try:
             filename = resume.get("filename", "Unknown")
+            send_progress(json.dumps({"status":"progress","message":f"Processing {filename} "}))
             resume_json = str(resume.get("parsed_data"))
-            print(f"Processing resume: {filename}")
             if resume_json:
                 start_index = resume_json.find('{')
                 end_index = resume_json.rfind('}')+1
                 resume_json = resume_json[start_index:end_index]
-                # resume_json = json_text.encode().decode('unicode_escape')  # handles \n, \"
                 ranking_text = rank_resume(job_description, resume_json)
-                # resume_response = parse_ranking_result(ranking_text)
-                # score, remarks, phone, email = resume_response
                 resume_response = json.loads(ranking_text)
-                score = resume_response.get("score")
-                remarks = resume_response.get("remarks")    
-                phone = resume_response.get("phone")    
-                email = resume_response.get("email")
-                experience = resume_response.get("experience")
                 result = {
-                    "resume_id": resume["_id"],
-                    "filename":filename, 
-                    "score": score if score is not None else -1,
-                    "remarks":remarks,
-                    "phone":phone,
-                    "email":email,
-                    "experience":experience
+                    "filename": filename,
+                    "score": resume_response.get("score", -1),
+                    "remarks": resume_response.get("remarks"),
+                    "phone": resume_response.get("phone"),
+                    "email": resume_response.get("email"),
+                    "experience": resume_response.get("experience")
                 }
                 results.append(result)
+                send_progress(json.dumps({"status":"progress","message":f"Done processing {filename}"}))
             else:
-                print(f"Skipping resume due to missing parsed data: {filename}")
+                send_progress(json.dumps({"status":"progress","message":f"Unable to process {filename}"}))
         except Exception as e:
-            print(f"Error processing resume {filename}: {e}")
-    if results:
-        # Store ranking results in database
-        ranking_doc = {
-            "job_description": job_description,
-            "results": results,
-            "created_at": datetime.utcnow()
-        }
-        rankings_collection.insert_one(ranking_doc)
-        print(f"Stored ranking results for {len(results)} resumes")
-    return results
+            send_progress(json.dumps({"status":"failed","message":f"Error processing {filename}: {str(e)}"}))
+    # send final results
+    send_progress(json.dumps({
+        "status": "complete",
+        "count": len(results),
+        "results": results
+    }))
 
+
+def send_progress(message: str):
+    with progress_lock:
+        progress_messages.append(message)
 
 # Flask Routes
+@app.route("/progress_stream")
+def progress_stream():
+    def event_stream():
+        last_index = 0
+        while True:
+            time.sleep(1)  # Poll every second
+            with progress_lock:
+                new_msgs = progress_messages[last_index:]
+                last_index = len(progress_messages)
+            for msg in new_msgs:
+                yield f"data: {msg}\n\n"
+    return Response(event_stream(), mimetype="text/event-stream")
+
+
 @app.route('/upload_resume', methods=['POST'])
 def upload_resume():
     """Upload and store resume in MongoDB"""
@@ -360,22 +371,11 @@ def process_resumes():
         if not data or "job_Description" not in data:
             return jsonify({"error": "Missing job_Description in request"}), 400
         job_description = data.get("job_Description")
-        if not job_description.strip():
-            return jsonify({"error": "Job description cannot be empty"}), 400
         print("Received job description:")
         print(job_description)
-        results = process_resumes_from_db(job_description)
-        sorted_results = sorted(
-                    results,
-                    key=lambda x: x["score"],
-                    reverse=True
-                )
-        num_processed = len(sorted_results)
-        return jsonify({
-            "message": f"Job description received successfully. {num_processed} resumes processed.",
-            "count": num_processed,
-            "results": sorted_results
-        })
+        # Trigger processing (final results will be sent via SSE)
+        process_resumes_from_db(job_description)
+        return jsonify({"message": "Resume processing done."}), 200
     except Exception as e:
         return jsonify({"error": f"Processing failed: {str(e)}"}), 500
 

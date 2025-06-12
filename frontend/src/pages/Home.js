@@ -25,52 +25,62 @@ function Home() {
   const PAGE_SIZE = 10;
   const [page, setPage] = useState(1);
 
-  const handleSubmit = async () => {
+  // === Server-Sent Events Streaming ===
+  const startStreaming = async () => {
     setLoading(true);
     setTableData([]);
     setShowTable(false);
     setTableError("");
     setPage(1);
-
     if (!job_Description.trim()) {
       toast.error("Please enter a job description.");
       setLoading(false);
       return;
     }
-
     try {
-      toast.info("Sending job description...");
-      const res = await axios.post(
-        `${BASE_URL}/process_resumes`,
-        { job_Description },
-        { headers: { "Content-Type": "application/json" } }
-      );
-
-      const { count, results } = res.data;
-      toast.success(`${count} resumes processed!`);
-
-      if (results?.length) {
-        setTableData(results);
-        setShowTable(true);
-      } else {
-        setTableError("No results found.");
-        setShowTable(false);
-      }
-      setJobDescription("");
+      toast.info("Streaming resume analysis...");
+      const eventSource = new EventSource(`${BASE_URL}/progress_stream`);
+      eventSource.onopen = () => {
+        console.log("SSE connection opened");
+      };
+      eventSource.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.status === "complete") {
+          if(data.message) toast.success(data.message);
+          else {
+            const { count, results } = data;
+            toast.success(`${count} resumes processed!`);
+            if (results?.length) {
+              setTableData(results);
+              setShowTable(true);
+            } else {
+              setTableError("No results found.");
+              setShowTable(false);
+            }
+          }
+          eventSource.close();
+        } else toast.info(data.message);
+      };
+      eventSource.onerror = (err) => {
+        console.error("SSE error:", err);
+        toast.error(`Error streaming data.${err}`);
+        eventSource.close();
+      };
+      await axios.post(`${BASE_URL}/process_resumes`, { job_Description }, {
+        headers: { "Content-Type": "application/json" },
+      });
     } catch (error) {
       console.error("Submission failed:", error);
-      toast.error("Error processing resumes.");
-      setShowTable(false);
+      toast.error(`Failed to start streaming. Error: ${error.message}`);
     } finally {
       setLoading(false);
+      setJobDescription("");
     }
   };
 
-  // 1) Filter → 2) Sort → 3) Paginate
   const paginatedData = useMemo(() => {
     let data = [...tableData];
 
-    // filtering
     if (minScore !== "") {
       const ms = Number(minScore);
       if (!isNaN(ms)) data = data.filter((r) => (r.score ?? 0) >= ms);
@@ -80,19 +90,16 @@ function Home() {
       if (!isNaN(me)) data = data.filter((r) => (r.experience ?? 0) >= me);
     }
 
-    // sorting
     data.sort((a, b) => {
       const aVal = Number(a[sortKey] ?? 0);
       const bVal = Number(b[sortKey] ?? 0);
       return sortOrder === "asc" ? aVal - bVal : bVal - aVal;
     });
 
-    // pagination
     const start = (page - 1) * PAGE_SIZE;
     return data.slice(start, start + PAGE_SIZE);
   }, [tableData, minScore, minExp, sortKey, sortOrder, page]);
 
-  // compute total pages
   const totalPages = useMemo(() => {
     let count = tableData.length;
     if (minScore !== "") {
@@ -131,7 +138,7 @@ function Home() {
             />
             <button
               disabled={loading}
-              onClick={handleSubmit}
+              onClick={startStreaming}
               style={{
                 padding: "12px 24px", borderRadius: 8, backgroundColor: "#2c3e50",
                 color: "#fff", fontSize: 16, border: "none",
@@ -173,7 +180,7 @@ function Home() {
         </div>
       )}
 
-      {/* Filters + Sort + Pagination + Table */}
+      {/* Table & Filters */}
       {showTable && (
         <>
           {/* Filters & Sort */}
