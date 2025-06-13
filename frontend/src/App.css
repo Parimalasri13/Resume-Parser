@@ -36,19 +36,3 @@
     transform: rotate(360deg);
   }
 }
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 6px solid #f3f3f3;
-  border-top: 6px solid #2c3e50;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0 auto;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
