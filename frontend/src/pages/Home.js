@@ -13,6 +13,10 @@ function Home() {
   const [tableError, setTableError] = useState("");
   const [showTable, setShowTable] = useState(false);
 
+  // Progress Bar
+  const [doneCount, setDoneCount] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+
   // Sorting
   const [sortKey, setSortKey] = useState("score");
   const [sortOrder, setSortOrder] = useState("desc");
@@ -27,6 +31,8 @@ function Home() {
 
   // === Server-Sent Events Streaming ===
   const startStreaming = async () => {
+    setDoneCount(0);
+    setTotalCount(0);
     setLoading(true);
     setTableData([]);
     setShowTable(false);
@@ -46,6 +52,8 @@ function Home() {
       eventSource.onmessage = (event) => {
         const data = JSON.parse(event.data);
         if (data.status === "complete") {
+          setDoneCount(0);
+          setTotalCount(0);
           if(data.message) toast.success(data.message);
           else {
             const { count, results } = data;
@@ -59,7 +67,13 @@ function Home() {
             }
           }
           eventSource.close();
-        } else toast.info(data.message);
+        } else {
+          if (typeof data.done === "number" && typeof data.total === "number") {
+            setDoneCount(data.done);
+            setTotalCount(data.total);
+          }
+          // toast.info(data.message);
+        }
       };
       eventSource.onerror = (err) => {
         console.error("SSE error:", err);
@@ -123,26 +137,59 @@ function Home() {
         maxWidth: 1000, margin: "0 auto 40px", backgroundColor: "#fff", borderRadius: 16,
         padding: 30, boxShadow: "0 4px 12px rgba(0,0,0,0.1)", display: "flex", gap: 30, alignItems: "center", flexWrap: "wrap"
       }}>
-        <div style={{ flex: "1 1 400px", minWidth: 300 }}>
+        <div>
           <h2 style={{ color: "#2c3e50", marginBottom: 20 }}>Enter Job Description</h2>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <input
+          <div style={{ display: "flex", flexDirection: "column"}}>
+            <textarea
               type="text"
               value={job_Description}
               onChange={(e) => setJobDescription(e.target.value)}
               placeholder="Paste your job description..."
               style={{
-                flex: 1, padding: "12px 16px", borderRadius: 8,
-                border: "1px solid #ccc", fontSize: 16, minWidth: 250,
+                padding: "12px 16px", borderRadius: 8,
+                border: "1px solid #ccc", fontSize: 16, width: 500, height: 250, resize: "none"
               }}
             />
+            {totalCount > 0 && (
+                <div style={{ marginTop: 20 }}>
+                  <div style={{
+                    height: 20,
+                    width: 532,
+                    backgroundColor: "#e0e0e0",
+                    borderRadius: 10,
+                    overflow: "hidden",
+                    position: "relative"
+                  }}>
+                    <div style={{
+                      width: `${(doneCount / totalCount) * 100}%`,
+                      backgroundColor: "#27ae60",
+                      height: "100%",
+                      transition: "width 0.4s ease"
+                    }} />
+                    <div style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#2c3e50",
+                      fontWeight: "bold"
+                    }}>
+                      {doneCount} / {totalCount} Processed
+                    </div>
+                  </div>
+                </div>
+              )}
             <button
               disabled={loading}
               onClick={startStreaming}
               style={{
                 padding: "12px 24px", borderRadius: 8, backgroundColor: "#2c3e50",
-                color: "#fff", fontSize: 16, border: "none",
-                cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.5 : 1,
+                color: "#fff", fontSize: 16, border: "none", marginTop: 20,
+                cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.5 : 1, width: 100
               }}
             >
               Send
