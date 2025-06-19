@@ -117,46 +117,87 @@ function Home() {
   const tdStyle = { padding: "12px", borderBottom: "1px solid #eee" };
 
   return (
-    <div style={{ padding: 40, backgroundColor: "#f4f6f9", minHeight: "100vh", fontFamily: "Segoe UI, sans-serif" }}>
-      {/* Form */}
-      <div style={{
-        maxWidth: 1000, margin: "0 auto 40px", backgroundColor: "#fff", borderRadius: 16,
-        padding: 30, boxShadow: "0 4px 12px rgba(0,0,0,0.1)", display: "flex", gap: 30, alignItems: "center", flexWrap: "wrap"
-      }}>
-        <div style={{ flex: "1 1 400px", minWidth: 300 }}>
-          <h2 style={{ color: "#2c3e50", marginBottom: 20 }}>Enter Job Description</h2>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <input
-              type="text"
-              value={job_Description}
-              onChange={(e) => setJobDescription(e.target.value)}
-              placeholder="Paste your job description..."
-              style={{
-                flex: 1, padding: "12px 16px", borderRadius: 8,
-                border: "1px solid #ccc", fontSize: 16, minWidth: 250,
-              }}
-            />
-            <button
-              disabled={loading}
-              onClick={startStreaming}
-              style={{
-                padding: "12px 24px", borderRadius: 8, backgroundColor: "#2c3e50",
-                color: "#fff", fontSize: 16, border: "none",
-                cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.5 : 1,
-              }}
-            >
-              Send
-            </button>
-          </div>
-        </div>
-        <div style={{ flex: "1 1 300px", textAlign: "center" }}>
-          <img
-            src="Hand coding-pana.png"
-            alt="Job illustration"
-            style={{ width: "100%", maxWidth: 300, height: "auto", borderRadius: 12, boxShadow: "0 4px 10px rgba(0,0,0,0.05)" }}
-          />
-        </div>
-      </div>
+<div style={{
+  padding: 40,
+  backgroundColor: "#f4f6f9",
+  minHeight: "100vh",
+  fontFamily: "Segoe UI, sans-serif"
+}}>
+  {/* Form */}
+  <div style={{
+    maxWidth: 1000,
+    margin: "0 auto 40px",
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 30,
+    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+    display: "flex",
+    gap: 30,
+    alignItems: "center",
+    flexWrap: "wrap"
+  }}>
+    {/* Left Section */}
+    <div style={{ flex: "1 1 400px", minWidth: 500 }}>
+  <h2 style={{ color: "#2c3e50", marginBottom: 20 }}>Enter Job Description</h2>
+  
+  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <textarea
+      value={job_Description}
+      onChange={(e) => setJobDescription(e.target.value)}
+      placeholder="Paste your job description..."
+      style={{
+        padding: "12px 16px",
+        borderRadius: 8,
+        border: "1px solid #ccc",
+        fontSize: 16,
+        minWidth: 450,
+        minHeight: 250,
+        resize: "vertical",
+        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+        outline: "none",
+        transition: "border-color 0.3s",
+      }}
+    />
+    
+    <button
+      disabled={loading}
+      onClick={startStreaming}
+      style={{
+        alignSelf: "flex-start",
+        marginLeft: "40%",
+        padding: "12px 24px",
+        borderRadius: 8,
+        backgroundColor: "#2c3e50",
+        color: "#fff",
+        fontSize: 16,
+        border: "none",
+        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+        minHeight: 50,
+        cursor: loading ? "not-allowed" : "pointer",
+        opacity: loading ? 0.5 : 1,
+      }}
+    >
+      Send
+    </button>
+  </div>
+</div>
+
+
+    {/* Right Section - Image */}
+    <div style={{ flex: "1 1 300px", textAlign: "center" }}>
+      <img
+        src="Hand coding-pana.png"
+        alt="Job illustration"
+        style={{
+          width: "100%",
+          maxWidth: 300,
+          height: "auto",
+          borderRadius: 12,
+          boxShadow: "0 4px 10px rgba(0,0,0,0.05)"
+        }}
+      />
+    </div>
+  </div>
 
       {/* Loader */}
       {loading && (

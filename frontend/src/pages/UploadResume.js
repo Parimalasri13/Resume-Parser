@@ -39,6 +39,7 @@ function UploadResume() {
     } catch (error) {
       const errorMessage =
         error?.response?.data?.error || "Upload failed. Please try again.";
+      console.error("Upload error:", errorMessage);
       toast.error(errorMessage);
     } finally {
       setUploading(false);
