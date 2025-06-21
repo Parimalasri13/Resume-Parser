@@ -233,13 +233,14 @@ def process_resumes_from_db(job_description: str) -> List[Dict]:
         progress_messages.clear()
     results = []
     resumes = get_all_resumes_from_db()
+    total = len(resumes)
     if not resumes:
         send_progress(json.dumps({"status":"complete","message":"No resumes found in the database."}))
         return results
-    for resume in resumes:
+    for i, resume in enumerate(resumes):
         try:
             filename = resume.get("filename", "Unknown")
-            send_progress(json.dumps({"status":"progress","message":f"Processing {filename} "}))
+            send_progress(json.dumps({"status":"progress","message":f"Processing {filename} ","done":i,"total":total}))
             resume_json = str(resume.get("parsed_data"))
             if resume_json:
                 start_index = resume_json.find('{')
@@ -256,11 +257,11 @@ def process_resumes_from_db(job_description: str) -> List[Dict]:
                     "experience": resume_response.get("experience")
                 }
                 results.append(result)
-                send_progress(json.dumps({"status":"progress","message":f"Done processing {filename}"}))
+                send_progress(json.dumps({"status":"progress","message":f"Done processing {filename}","done":i+1,"total":total}))
             else:
-                send_progress(json.dumps({"status":"progress","message":f"Unable to process {filename}"}))
+                send_progress(json.dumps({"status":"progress","message":f"Unable to process {filename}", "done":i+1,"total":total}))
         except Exception as e:
-            send_progress(json.dumps({"status":"failed","message":f"Error processing {filename}: {str(e)}"}))
+            send_progress(json.dumps({"status":"failed","message":f"Error processing {filename}: {str(e)}", "done":i+1,"total":total}))
     # send final results
     send_progress(json.dumps({
         "status": "complete",
@@ -268,12 +269,9 @@ def process_resumes_from_db(job_description: str) -> List[Dict]:
         "results": results
     }))
 
-def get_resume_count_from_db():
-    return resumes_collection.count_documents({})
-
 @app.route('/resume_count')
 def resume_count():
-    return jsonify({"count": get_resume_count_from_db()})
+    return jsonify({"count": resumes_collection.count_documents({})})
 
 
 def send_progress(message: str):

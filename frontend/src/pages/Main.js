@@ -10,11 +10,10 @@ import  {  useEffect } from "react";
 import { saveAs } from 'file-saver';
 import JSZip from 'jszip';
 
-const BASE_URL = process.env.REACT_APP_SERVER_URL;
 
 const styles = {
   container: {
-    minHeight: "100vh",
+    // minHeight: "100vh",
     backgroundColor: "#f9fafb",
     padding: "24px",
     fontFamily: "Arial, sans-serif",
@@ -218,10 +217,12 @@ const HRPortalDashboard = () => {
 
   // Pagination
   const PAGE_SIZE = 10;
+  const matchRate = 75;
   const [page, setPage] = useState(1);
 
-  const [resumeCount, setResumeCount] = useState( 1);
+  const [resumeCount, setResumeCount] = useState();
   const [updatedCount, setUpdatedCount] = useState(0);
+  const [shortListCount,setShortListCount] = useState(0);
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
 
@@ -268,47 +269,49 @@ const HRPortalDashboard = () => {
   
 
   // Function to handle CSV download and resume zippin
-  const handleDownload = async () => {
-  // Convert table data to CSV format
-  const csvHeaders = ["Filename", "Score", "Remarks", "Phone", "Email", "Experience"];
-  const rows = paginatedData.map(row => [
-    row.filename,
-    `${row.score}%`,
-    row.remarks?.replace(/\n/g, ' ') || '',
-    row.phone || '',
-    row.email || '',
-    row.experience !== null ? `${row.experience} yrs` : ''
-  ]);
-
-  const csvContent = [csvHeaders, ...rows]
-    .map(e => e.map(field => `"${field}"`).join(","))
-    .join("\n");
-
-  // Create a zip file
-  const zip = new JSZip();
-  zip.file("candidates.csv", csvContent);
-
-  // Fetch and add resume files (assuming `row.resumeUrl` exists and is accessible)
-  const resumeFetches = paginatedData.map(async (row) => {
-    if (row.resumeUrl) {
-      const response = await fetch(row.resumeUrl);
-      const blob = await response.blob();
-      zip.file(row.filename, blob); // Preserve filename
-    }
-  });
-
-  await Promise.all(resumeFetches);
-
-  // Generate and trigger download
-  zip.generateAsync({ type: "blob" }).then(content => {
-    saveAs(content, "candidate_data.zip");
-  });
-};
+  const handleDownload = () => {
+    const csvHeaders = ["Filename", "Score", "Remarks", "Phone", "Email", "Experience"];
+    const rows = paginatedData.map(row => [
+      row.filename,
+      `${row.score}%`,
+      row.remarks?.replace(/\n/g, ' ') || '',
+      row.phone || '',
+      row.email || '',
+      row.experience !== null ? `${row.experience} yrs` : ''
+    ]);
+  
+    const csvContent = [csvHeaders, ...rows]
+      .map(e => e.map(field => `"${field}"`).join(","))
+      .join("\n");
+  
+    // Create Blob
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  
+    // Format filename with date-time
+    const now = new Date();
+    const formatted = now.toLocaleString("en-IN", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    }).replace(/[/:, ]+/g, "_"); // Replace invalid filename characters
+  
+    const filename = `candidates_${formatted}.csv`;
+  
+    // Trigger download
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };  
 
   
   useEffect(() => {
   const fetchResumeCount = async () => {
-    setResumeCount(1);  // default to 1 to avoid div-by-zero
     try {
       const res = await axios.get(`${BASE_URL}/resume_count`);
       setResumeCount(res.data.count || 0);
@@ -319,7 +322,7 @@ const HRPortalDashboard = () => {
   };
 
   fetchResumeCount();
-}, []);
+}, [resumeCount]);
 
  let eventSource; // Declare in outer scope
 
@@ -354,15 +357,18 @@ const HRPortalDashboard = () => {
 
     eventSource.onmessage = (event) => {
       const data = JSON.parse(event.data);
-
       if (data.status === "complete") {
-        if (data.message) toast.success(data.message);
+        setUpdatedCount(0);
+        // setTotalCount(0);
+        if(data.message) toast.success(data.message);
         else {
           const { count, results } = data;
-          setResumeCount(count);
           toast.success(`${count} resumes processed!`);
           if (results?.length) {
             setTableData(results);
+            for (let i = 0; i < results.length; i++) {
+              if(results[i].score >= matchRate) setShortListCount(prev => prev + 1);
+            }
             setShowTable(true);
           } else {
             setTableError("No results found.");
@@ -371,16 +377,17 @@ const HRPortalDashboard = () => {
         }
         eventSource.close();
       } else {
-        if (data.message?.includes("Processing")) {
-          setUpdatedCount((prev) => prev + 1);
+        if (typeof data.done === "number" && typeof data.total === "number") {
+          setUpdatedCount(data.done);
+          // setTotalCount(data.total);
         }
-        toast.info(data.message);
+        // toast.info(data.message);
       }
     };
 
     eventSource.onerror = (err) => {
       console.error("SSE error:", err);
-      toast.error("Error streaming data.");
+      toast.error(`Error streaming data. ${err}`);
       eventSource.close();
     };
 
@@ -462,6 +469,7 @@ const HRPortalDashboard = () => {
       });
 
       toast.success(res.data.message || "Files uploaded successfully!");
+      setResumeCount();
       setSelectedFiles([]);
       if (fileInputRef.current) fileInputRef.current.value = null;
     } catch (error) {
@@ -490,17 +498,13 @@ const HRPortalDashboard = () => {
           {/* <h1 style={{ fontSize: "24px", fontWeight: "bold", color: "#1e40af" }}>HR Portal</h1> */}
           <p style={styles.cardText}>Intelligent Candidate Management</p>
         </div>
-        <div style={{ textAlign: "right" }}>
-          <p style={styles.cardText}>0 Total Candidates</p>
-          <p style={styles.smallNote}>0 Showing</p>
-        </div>
       </header>
 
       <div style={styles.cardGrid}>
         <Card>
           <CardContent>
             <p style={styles.cardText}>Total Resumes</p>
-            <p style={styles.cardValue}>0</p>
+            <p style={styles.cardValue}>{resumeCount}</p>
             <p style={styles.smallNote}>Uploaded resumes</p>
           </CardContent>
         </Card>
@@ -508,7 +512,7 @@ const HRPortalDashboard = () => {
         <Card>
           <CardContent>
             <p style={styles.cardText}>Shortlisted</p>
-            <p style={styles.cardValue}>0</p>
+            <p style={styles.cardValue}>{shortListCount}</p>
             <p style={styles.smallNote}>Matching candidates</p>
           </CardContent>
         </Card>
@@ -516,7 +520,7 @@ const HRPortalDashboard = () => {
         <Card>
           <CardContent>
             <p style={styles.cardText}>Match Rate</p>
-            <p style={styles.cardValue}>0%</p>
+            <p style={styles.cardValue}>{matchRate}%</p>
             <p style={styles.smallNote}>Job relevance</p>
           </CardContent>
         </Card>
@@ -734,15 +738,14 @@ const HRPortalDashboard = () => {
   <>
     {/* Filters & Sort */}
     <div style={{
-      maxWidth: 1000,
-      margin: "0 auto 16px",
+      margin: "24px",
       display: "flex",
       gap: 16,
       alignItems: "center",
       flexWrap: "wrap",
       justifyContent: "space-between"
     }}>
-      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+      <div style={{ display: "flex", gap: 12, alignItems: "center", flex:1 }}>
         <label style={{ color: "#2c3e50", fontWeight: 500 }}>
           Min Score:&nbsp;
           <input
@@ -781,7 +784,7 @@ const HRPortalDashboard = () => {
           />
         </label>
       </div>
-      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+      <div style={{ display: "flex", gap: 12, alignItems: "center", flex: 1, justifyContent: "flex-end" }}>
         <label style={{ color: "#2c3e50", fontWeight: 500 }}>
           Sort by:&nbsp;
           <select
