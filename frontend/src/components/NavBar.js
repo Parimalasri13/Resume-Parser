@@ -77,9 +77,9 @@ const Navbar = () => {
     >
       <h2 style={{ color: "#1e40af", margin: 0, fontSize: "20px" }}>HR Portal</h2>
       <div>
-        <Link to="/" style={linkStyle("/")}>Home</Link>
-        <Link to="/upload-resume" style={linkStyle("/upload-resume")}>Upload Resume</Link>
-        <Link to="/main" style={linkStyle("/main")}>Dashboard</Link>
+        {/* <Link to="/" style={linkStyle("/")}>Home</Link>
+        <Link to="/upload-resume" style={linkStyle("/upload-resume")}>Upload Resume</Link> */}
+        <Link to="/" style={linkStyle("/")}>Dashboard</Link>
       </div>
     </nav>
   );

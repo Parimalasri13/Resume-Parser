@@ -12,9 +12,9 @@ function App() {
       <Navbar />
       <Routes>
         {/* Default route for Home page */}
-        <Route path="/" element={<Home />} />
-        <Route path="/upload-resume" element={<UploadResume />} />
-        <Route path="/main" element={<Main />} />
+        {/* <Route path="/" element={<Home />} />
+        <Route path="/upload-resume" element={<UploadResume />} /> */}
+        <Route path="/" element={<Main />} />
       </Routes>
       {/* <Footer /> */}
     </Router>

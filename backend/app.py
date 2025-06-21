@@ -265,6 +265,13 @@ def process_resumes_from_db(job_description: str) -> List[Dict]:
         "results": results
     }))
 
+def get_resume_count_from_db():
+    return resumes_collection.count_documents({})
+
+@app.route('/resume_count')
+def resume_count():
+    return jsonify({"count": get_resume_count_from_db()})
+
 
 def send_progress(message: str):
     with progress_lock:
@@ -285,33 +292,49 @@ def progress_stream():
     return Response(event_stream(), mimetype="text/event-stream")
 
 
-@app.route('/upload_resume', methods=['POST'])
-def upload_resume():
-    """Upload and store resume in MongoDB"""
+@app.route('/upload_resumes', methods=['POST'])
+def upload_resumes():
+    """Upload and store multiple resumes in MongoDB"""
     try:
-        if 'file' not in request.files:
-            return jsonify({"error": "No file provided"}), 400
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({"error": "No file selected"}), 400
-        if not file.filename.lower().endswith('.pdf'):
-            return jsonify({"error": "Only PDF files are supported"}), 400
-        # Read PDF bytes
-        pdf_bytes = file.read()
-        # Extract text and parse resume
-        text = extract_text_from_pdf_bytes(pdf_bytes)
-        if not text:
-            return jsonify({"error": "Could not extract text from PDF"}), 400
-        resume_json = extract_resume_json(text, file.filename)
-        if not resume_json:
-            return jsonify({"error": "Could not parse resume content"}), 400
-        # Store in database
-        resume_id = store_resume_in_db(file.filename, pdf_bytes, resume_json)
-        if not resume_id:
-            return jsonify({"error": "Failed to store resume in database"}), 500
+        if 'files' not in request.files:
+            return jsonify({"error": "No files provided"}), 400
+
+        files = request.files.getlist('files')
+        if not files:
+            return jsonify({"error": "No files selected"}), 400
+
+        results = []
+        for file in files:
+            if file.filename == '':
+                results.append({"file": "Unnamed", "status": "skipped", "reason": "No filename"})
+                continue
+            if not file.filename.lower().endswith('.pdf'):
+                results.append({"file": file.filename, "status": "skipped", "reason": "Invalid format"})
+                continue
+
+            pdf_bytes = file.read()
+            text = extract_text_from_pdf_bytes(pdf_bytes)
+            if not text:
+                results.append({"file": file.filename, "status": "error", "reason": "Text extraction failed"})
+                continue
+
+            resume_json = extract_resume_json(text, file.filename)
+            if not resume_json:
+                results.append({"file": file.filename, "status": "error", "reason": "Parsing failed"})
+                continue
+
+            resume_id = store_resume_in_db(file.filename, pdf_bytes, resume_json)
+            if not resume_id:
+                results.append({"file": file.filename, "status": "error", "reason": "Database error"})
+                continue
+
+            results.append({"file": file.filename, "status": "success"})
+
         return jsonify({
-            "message": "Resume uploaded successfully",
+            "message": f"{len([r for r in results if r['status'] == 'success'])} of {len(results)} resumes uploaded",
+            "details": results
         })
+
     except Exception as e:
         return jsonify({"error": f"Upload failed: {str(e)}"}), 500
 
