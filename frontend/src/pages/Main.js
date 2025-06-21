@@ -328,7 +328,7 @@ const HRPortalDashboard = () => {
   };
 
   const startStreaming = async () => {
-setLoading(true);
+  setLoading(true);
   setTableData([]);
   setShowTable(false);
   setTableError("");
@@ -346,7 +346,7 @@ setLoading(true);
 
   try {
     toast.info("Streaming resume analysis...");
-    eventSource = new EventSource(`${BASE_URL}/progress_stream`);
+    eventSource = new EventSource(`${BASE_URL}/progress_stream?t=${Date.now()}`);
 
     eventSource.onopen = () => {
       console.log("SSE connection opened");

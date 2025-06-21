@@ -228,6 +228,9 @@ def get_all_resumes_from_db() -> List[Dict]:
 
 
 def process_resumes_from_db(job_description: str) -> List[Dict]:
+    with progress_lock:
+        # clear old progress messages
+        progress_messages.clear()
     results = []
     resumes = get_all_resumes_from_db()
     if not resumes:
