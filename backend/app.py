@@ -5,9 +5,14 @@ import time
 from typing import Dict, List, Optional
 from datetime import datetime
 
+import requests
+from sentence_transformers import SentenceTransformer
+import faiss
+import numpy as np
+import tiktoken
 import fitz  # PyMuPDF
 import pandas as pd
-import requests
+
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -16,6 +21,10 @@ from bson import ObjectId
 import gridfs
 from flask import Response
 import threading
+from flask import send_file, Response
+import io
+
+
 
 # Global variable to store progress messages
 progress_messages = []
@@ -35,6 +44,8 @@ GROQ_API_URL = os.getenv("GROQ_API_URL")
 API_KEY = os.getenv("API_KEY")
 MONGO_URI = os.getenv("MONGO_URI")
 DATABASE_NAME = os.getenv("DATABASE_NAME")
+COLLECTION_NAME = "resumes"
+DB_NAME = "resume_db"
 
 HEADERS = {
     "Authorization": f"Bearer {API_KEY}",
@@ -47,12 +58,90 @@ try:
     db = client[DATABASE_NAME]
     fs = gridfs.GridFS(db)  # For storing PDF files
     resumes_collection = db.resumes  # For storing resume metadata and parsed data
-    rankings_collection = db.rankings  # For storing ranking results
+    rankings_collection = db.rankings 
+    collection = client[DATABASE_NAME][COLLECTION_NAME] # For storing ranking results
+    documents = list(collection.find({"processed": True}))
+    parsed_data = [doc.get("parsed_data") for doc in documents if doc.get("parsed_data")]
+    print(f"✅ Loaded {len(parsed_data)} processed resumes")
     print("Connected to MongoDB successfully")
+    print("🔍 Creating FAISS index...")
+    model = SentenceTransformer("all-MiniLM-L6-v2")
+    texts = [json.dumps(resume, indent=2) for resume in parsed_data]
+    embeddings = model.encode(texts, convert_to_numpy=True)
+    faiss_index = faiss.IndexFlatL2(embeddings.shape[1])
+    faiss_index.add(embeddings)
+    print("✅ FAISS index ready")
 except Exception as e:
     print(f"Failed to connect to MongoDB: {e}")
     client = None
 
+def retrieve_top_k_chunks(query, model, index, texts, k=4):
+    query_embedding = model.encode([query], convert_to_numpy=True)
+    distances, indices = index.search(query_embedding, k)
+    return [texts[i] for i in indices[0]]
+
+def build_prompt(chunks, user_query):
+    return f"""You are a resume analysis assistant. Use the following candidate data to answer the question.
+
+Candidate Data:
+{chunks}
+
+Question: {user_query}
+Answer:"""
+
+def query_llama(prompt):
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": "llama3-70b-8192",
+        "messages": [
+            {"role": "system", "content": "You are a helpful assistant that understands JSON resume data."},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.2
+    }
+    response = requests.post(GROQ_API_URL, headers=headers, json=payload)
+    response.raise_for_status()
+    return response.json()["choices"][0]["message"]["content"]
+
+def is_global_query(query):
+    keywords = ["how many", "total", "count", "list all", "summary", "give me all"]
+    return any(k in query.lower() for k in keywords)
+
+# === API Endpoint ===
+@app.route("/query", methods=["POST"])
+def query_resume():
+    data = request.json
+    user_query = data.get("query", "")
+
+    if not user_query.strip():
+        return jsonify({"error": "Query is required"}), 400
+
+    try:
+        if is_global_query(user_query):
+            if "how many" in user_query.lower() and "candidates" in user_query.lower():
+                return jsonify({"response": f"There are {len(parsed_data)} candidates in the database."})
+
+            elif "list all" in user_query.lower() and "names" in user_query.lower():
+                names = [res.get("name", "Unknown") for res in parsed_data]
+                return jsonify({"response": names})
+
+            elif "summary" in user_query.lower():
+                summary_data = "\n\n".join([json.dumps(r, indent=2) for r in parsed_data[:5]])
+                prompt = build_prompt(summary_data, user_query)
+                response = query_llama(prompt)
+                return jsonify({"response": response})
+
+        # Fallback: use RAG
+        top_chunks = retrieve_top_k_chunks(user_query, model, faiss_index, texts)
+        prompt = build_prompt("\n\n".join(top_chunks), user_query)
+        response = query_llama(prompt)
+        return jsonify({"response": response})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 def post_with_retries(url: str, headers: Dict, payload: Dict) -> requests.Response:
     """Make API request with exponential backoff retry logic"""
@@ -114,6 +203,7 @@ def extract_resume_json(resume_text, source_name=""):
         '"contactInfo", "education", "experience", "projects", "technicalSkills", '
         '"certifications", "extraCurriculars", "achievements". '
         "Do NOT include any markdown, commentary, or trailing commas."
+        
     )
     user_msg = f"Parse the following resume text into JSON:\n\n{resume_text}"
 
@@ -228,15 +318,19 @@ def get_all_resumes_from_db() -> List[Dict]:
 
 
 def process_resumes_from_db(job_description: str) -> List[Dict]:
+    with progress_lock:
+        # clear old progress messages
+        progress_messages.clear()
     results = []
     resumes = get_all_resumes_from_db()
+    total = len(resumes)
     if not resumes:
         send_progress(json.dumps({"status":"complete","message":"No resumes found in the database."}))
         return results
-    for resume in resumes:
+    for i, resume in enumerate(resumes):
         try:
             filename = resume.get("filename", "Unknown")
-            send_progress(json.dumps({"status":"progress","message":f"Processing {filename} "}))
+            send_progress(json.dumps({"status":"progress","message":f"Processing {filename} ","done":i,"total":total}))
             resume_json = str(resume.get("parsed_data"))
             if resume_json:
                 start_index = resume_json.find('{')
@@ -253,17 +347,21 @@ def process_resumes_from_db(job_description: str) -> List[Dict]:
                     "experience": resume_response.get("experience")
                 }
                 results.append(result)
-                send_progress(json.dumps({"status":"progress","message":f"Done processing {filename}"}))
+                send_progress(json.dumps({"status":"progress","message":f"Done processing {filename}","done":i+1,"total":total}))
             else:
-                send_progress(json.dumps({"status":"progress","message":f"Unable to process {filename}"}))
+                send_progress(json.dumps({"status":"progress","message":f"Unable to process {filename}", "done":i+1,"total":total}))
         except Exception as e:
-            send_progress(json.dumps({"status":"failed","message":f"Error processing {filename}: {str(e)}"}))
+            send_progress(json.dumps({"status":"failed","message":f"Error processing {filename}: {str(e)}", "done":i+1,"total":total}))
     # send final results
     send_progress(json.dumps({
         "status": "complete",
         "count": len(results),
         "results": results
     }))
+
+@app.route('/resume_count')
+def resume_count():
+    return jsonify({"count": resumes_collection.count_documents({})})
 
 
 def send_progress(message: str):
@@ -285,37 +383,77 @@ def progress_stream():
     return Response(event_stream(), mimetype="text/event-stream")
 
 
-@app.route('/upload_resume', methods=['POST'])
-def upload_resume():
-    """Upload and store resume in MongoDB"""
+@app.route('/upload_resumes', methods=['POST'])
+def upload_resumes():
+    """Upload and store multiple resumes in MongoDB"""
     try:
-        if 'file' not in request.files:
-            return jsonify({"error": "No file provided"}), 400
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({"error": "No file selected"}), 400
-        if not file.filename.lower().endswith('.pdf'):
-            return jsonify({"error": "Only PDF files are supported"}), 400
-        # Read PDF bytes
-        pdf_bytes = file.read()
-        # Extract text and parse resume
-        text = extract_text_from_pdf_bytes(pdf_bytes)
-        if not text:
-            return jsonify({"error": "Could not extract text from PDF"}), 400
-        resume_json = extract_resume_json(text, file.filename)
-        if not resume_json:
-            return jsonify({"error": "Could not parse resume content"}), 400
-        # Store in database
-        resume_id = store_resume_in_db(file.filename, pdf_bytes, resume_json)
-        if not resume_id:
-            return jsonify({"error": "Failed to store resume in database"}), 500
+        if 'files' not in request.files:
+            return jsonify({"error": "No files provided"}), 400
+
+        files = request.files.getlist('files')
+        if not files:
+            return jsonify({"error": "No files selected"}), 400
+
+        results = []
+        for file in files:
+            if file.filename == '':
+                results.append({"file": "Unnamed", "status": "skipped", "reason": "No filename"})
+                continue
+            if not file.filename.lower().endswith('.pdf'):
+                results.append({"file": file.filename, "status": "skipped", "reason": "Invalid format"})
+                continue
+
+            pdf_bytes = file.read()
+            text = extract_text_from_pdf_bytes(pdf_bytes)
+            if not text:
+                results.append({"file": file.filename, "status": "error", "reason": "Text extraction failed"})
+                continue
+
+            resume_json = extract_resume_json(text, file.filename)
+            if not resume_json:
+                results.append({"file": file.filename, "status": "error", "reason": "Parsing failed"})
+                continue
+
+            resume_id = store_resume_in_db(file.filename, pdf_bytes, resume_json)
+            if not resume_id:
+                results.append({"file": file.filename, "status": "error", "reason": "Database error"})
+                continue
+
+            results.append({"file": file.filename, "status": "success"})
+
         return jsonify({
-            "message": "Resume uploaded successfully",
+            "message": f"{len([r for r in results if r['status'] == 'success'])} of {len(results)} resumes uploaded",
+            "details": results
         })
+
     except Exception as e:
         return jsonify({"error": f"Upload failed: {str(e)}"}), 500
 
+@app.route("/download_resume/<resume_id>", methods=["GET"])
+def download_resume(resume_id):
+    try:
+        # Step 1: Look up resume document to get file_id
+        resume_doc = resumes_collection.find_one({"_id": ObjectId(resume_id)})
+        if not resume_doc or "file_id" not in resume_doc:
+            return {"error": "Resume not found or missing file_id"}, 404
 
+        file_id = resume_doc["file_id"]
+
+        # Step 2: Use GridFS to get the file
+        file_obj = fs.get(file_id)
+
+        # Step 3: Send file
+        return send_file(
+            io.BytesIO(file_obj.read()),
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name=file_obj.filename 
+        )
+
+    except gridfs.errors.NoFile:
+        return {"error": "File not found in GridFS"}, 404
+    except Exception as e:
+        return {"error": f"Failed to download file: {str(e)}"}, 500
 @app.route('/get_resumes', methods=['GET'])
 def get_resumes():
     """Get list of all stored resumes"""

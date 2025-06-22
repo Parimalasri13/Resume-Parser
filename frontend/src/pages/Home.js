@@ -4,6 +4,8 @@ import { toast, ToastContainer } from "react-toastify";
 import { Typewriter } from "react-simple-typewriter";
 import "react-toastify/dist/ReactToastify.css";
 import "../App.css";
+import  {  useEffect } from "react";
+
 
 function Home() {
   const BASE_URL = process.env.REACT_APP_SERVER_URL;
@@ -25,58 +27,99 @@ function Home() {
   const PAGE_SIZE = 10;
   const [page, setPage] = useState(1);
 
-  // === Server-Sent Events Streaming ===
-  const startStreaming = async () => {
-    setLoading(true);
-    setTableData([]);
-    setShowTable(false);
-    setTableError("");
-    setPage(1);
-    if (!job_Description.trim()) {
-      toast.error("Please enter a job description.");
-      setLoading(false);
-      return;
-    }
+  const [resumeCount, setResumeCount] = useState( 1);
+  const [updatedCount, setUpdatedCount] = useState(0);
+ 
+
+
+useEffect(() => {
+  const fetchResumeCount = async () => {
+    setResumeCount(1);  // default to 1 to avoid div-by-zero
     try {
-      toast.info("Streaming resume analysis...");
-      const eventSource = new EventSource(`${BASE_URL}/progress_stream`);
-      eventSource.onopen = () => {
-        console.log("SSE connection opened");
-      };
-      eventSource.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (data.status === "complete") {
-          if(data.message) toast.success(data.message);
-          else {
-            const { count, results } = data;
-            toast.success(`${count} resumes processed!`);
-            if (results?.length) {
-              setTableData(results);
-              setShowTable(true);
-            } else {
-              setTableError("No results found.");
-              setShowTable(false);
-            }
-          }
-          eventSource.close();
-        } else toast.info(data.message);
-      };
-      eventSource.onerror = (err) => {
-        console.error("SSE error:", err);
-        toast.error(`Error streaming data.${err}`);
-        eventSource.close();
-      };
-      await axios.post(`${BASE_URL}/process_resumes`, { job_Description }, {
-        headers: { "Content-Type": "application/json" },
-      });
-    } catch (error) {
-      console.error("Submission failed:", error);
-      toast.error(`Failed to start streaming. Error: ${error.message}`);
-    } finally {
-      setLoading(false);
-      setJobDescription("");
+      const res = await axios.get(`${BASE_URL}/resume_count`);
+      setResumeCount(res.data.count || 0);
+      console.log("Fetched resume count:", res.data.count);
+    } catch (err) {
+      console.error("Failed to fetch resume count", err);
     }
   };
+
+  fetchResumeCount();
+}, []);
+
+
+
+
+
+  let eventSource; // Declare in outer scope
+
+const startStreaming = async () => {
+  setLoading(true);
+  setTableData([]);
+  setShowTable(false);
+  setTableError("");
+  setPage(1);
+  setUpdatedCount(0); // reset count
+
+
+  if (!job_Description.trim()) {
+    toast.error("Please enter a job description.");
+    setLoading(false);
+    return;
+  }
+
+  try {
+    toast.info("Streaming resume analysis...");
+    eventSource = new EventSource(`${BASE_URL}/progress_stream`);
+
+    eventSource.onopen = () => {
+      console.log("SSE connection opened");
+    };
+
+    eventSource.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+
+      if (data.status === "complete") {
+        if (data.message) toast.success(data.message);
+        else {
+          const { count, results } = data;
+          setResumeCount(count); // final count
+          toast.success(`${count} resumes processed!`);
+          if (results?.length) {
+            setTableData(results);
+            setShowTable(true);
+          } else {
+            setTableError("No results found.");
+            setShowTable(false);
+          }
+        }
+        eventSource.close(); // ✅ works now because it's in scope
+      } else {
+        if (data.message?.includes("Processing")) {
+          setUpdatedCount((prev) => prev + 1);
+        }
+        toast.info(data.message);
+      }
+    };
+
+    eventSource.onerror = (err) => {
+      console.error("SSE error:", err);
+      toast.error(`Error streaming data.`);
+      eventSource.close();
+    };
+
+    await axios.post(`${BASE_URL}/process_resumes`, { job_Description }, {
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    console.error("Submission failed:", error);
+    toast.error(`Failed to start streaming. Error: ${error.message}`);
+  } finally {
+    setLoading(false);
+    setJobDescription("");
+  }
+};
+
 
   const paginatedData = useMemo(() => {
     let data = [...tableData];
@@ -115,6 +158,45 @@ function Home() {
 
   const headers = ["filename", "score", "remarks"];
   const tdStyle = { padding: "12px", borderBottom: "1px solid #eee" };
+
+
+  const styles = {
+  container: {
+    width: "80%",
+    maxWidth: "500px",
+    margin: "80px auto",
+    textAlign: "center",
+    fontFamily: "Arial, sans-serif",
+  },
+  topText: {
+    fontSize: "20px",
+    fontWeight: "bold",
+    marginBottom: "30px",
+    color: "#2c3e50",
+  },
+  progressBar: {
+    width: "100%",
+    height: "30px",
+    backgroundColor: "#f3f3f3",
+    borderRadius: "25px",
+    overflow: "hidden",
+    border: "2px solid #555",
+  },
+  fill: {
+    height: "100%",
+    backgroundColor: "#2c3e50",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#fff",
+    fontWeight: "bold",
+    transition: "width 0.4s ease-in-out",
+  },
+  countText: {
+    padding: "0 10px",
+  },
+};
+
 
   return (
 <div style={{
@@ -199,27 +281,45 @@ function Home() {
     </div>
   </div>
 
-      {/* Loader */}
-      {loading && (
-        <div style={{ textAlign: "center", margin: "80px 0", fontSize: 24, fontWeight: "bold", color: "#2c3e50" }}>
-          <Typewriter
-            words={[
-              "Initializing",
-              "Parsing Resume",
-              "Standby Mode: Active Learning",
-              "Ingesting new data streams...",
-              "Our AI system is adapting, evolving, every moment.",
-              "Knowledge base expanded. Ready for next query.",
-            ]}
-            loop={0}
-            cursor
-            cursorStyle="|"
-            typeSpeed={100}
-            deleteSpeed={30}
-            delaySpeed={1500}
-          />
-        </div>
-      )}
+
+{loading && (
+  <div style={styles.container}>
+    {/* Title and Typewriter */}
+    <div style={styles.topText}>
+      <p>Processing {resumeCount !== null ? resumeCount : "..."} resumes</p>
+      <Typewriter
+        words={[
+          "Initializing",
+          "Parsing Resume",
+          "Standby Mode: Active Learning",
+          "Ingesting new data streams...",
+          "Our AI system is adapting, evolving, every moment.",
+          "Knowledge base expanded. Ready for next query.",
+        ]}
+        loop={0}
+        cursor
+        cursorStyle="|"
+        typeSpeed={100}
+        deleteSpeed={30}
+        delaySpeed={1500}
+      />
+    </div>
+
+    {/* Progress Bar */}
+    <div style={styles.progressBar}>
+      <div
+        style={{
+          ...styles.fill,
+          width: `${Math.min((updatedCount / resumeCount) * 100, 100)}%`,
+        }}
+      >
+        <span style={styles.countText}>
+          {updatedCount} / {resumeCount}
+        </span>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Table & Filters */}
       {showTable && (

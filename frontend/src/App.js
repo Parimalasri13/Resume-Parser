@@ -4,6 +4,7 @@ import Home from './pages/Home'; // You should create corresponding page compone
 import UploadResume from './pages/UploadResume';
 import Navbar from './components/NavBar';
 import Main from './pages/Main';
+import ListResumes from './pages/Resumes';
 
 
 function App() {
@@ -12,9 +13,9 @@ function App() {
       <Navbar />
       <Routes>
         {/* Default route for Home page */}
-        <Route path="/" element={<Home />} />
-        <Route path="/upload-resume" element={<UploadResume />} />
-        <Route path="/main" element={<Main />} />
+        <Route path="/" element={<Main />} />
+        <Route path="/resumes" element={<ListResumes />} />
+        {/* <Route path="/upload-resume" element={<UploadResume />} /> */}
       </Routes>
       {/* <Footer /> */}
     </Router>
