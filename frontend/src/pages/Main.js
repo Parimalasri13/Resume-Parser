@@ -1,196 +1,14 @@
 
 import { Upload } from "lucide-react";
-import React, { useState, useRef, useMemo } from "react";
+import React, { useState, useRef, useMemo, useEffect } from "react";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import { Typewriter } from "react-simple-typewriter";
+import { FiDownload } from "react-icons/fi"; // install react-icons if not already
+import fileDownload from "js-file-download"; // install js-file-download if not already
 import "react-toastify/dist/ReactToastify.css";
+import styles from "../components/Styles";
 import "../App.css";
-import  {  useEffect } from "react";
-import { saveAs } from 'file-saver';
-import JSZip from 'jszip';
-
-
-const styles = {
-  container: {
-    // minHeight: "100vh",
-    backgroundColor: "#f9fafb",
-    padding: "24px",
-    fontFamily: "Arial, sans-serif",
-  },
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    marginBottom: "24px",
-  },
-  cardGrid: {
-    display: "grid",
-    gap: "16px",
-    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-    marginBottom: "32px",
-  },
-  card: {
-    backgroundColor: "#ffffff",
-    borderRadius: "12px",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
-    padding: "16px",
-  },
-  cardText: {
-    color: "#6b7280",
-    fontSize: "14px",
-  },
-  cardValue: {
-    fontSize: "24px",
-    fontWeight: "600",
-  },
-  smallNote: {
-    fontSize: "12px",
-    color: "#9ca3af",
-  },
-  uploadSection: {
-    backgroundColor: "#ffffff",
-    borderRadius: "12px",
-    padding: "24px",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
-    marginBottom: "32px",
-  },
-  dashedBox: {
-    border: "2px dashed #d1d5db",
-    borderRadius: "12px",
-    padding: "40px",
-    textAlign: "center",
-    color: "#6b7280",
-  },
-  floatingButton: {
-    position: "fixed",
-    bottom: "24px",
-    right: "24px",
-    background: "linear-gradient(to bottom right, #3b82f6, #8b5cf6)",
-    color: "#ffffff",
-    padding: "12px",
-    borderRadius: "9999px",
-    boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
-    border: "none",
-    fontSize: "18px",
-    cursor: "pointer",
-  },
-  jobSection: {
-    backgroundColor: "#ffffff",
-    borderRadius: "12px",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
-    padding: "24px",
-    marginBottom: "32px",
-  },
-  jobTitle: {
-    fontSize: "20px",
-    fontWeight: "bold",
-    color: "#15803d",
-  },
-  jobDesc: {
-    color: "#6b7280",
-    fontSize: "14px",
-    marginBottom: "12px",
-  },
-  textarea: {
-    width: "100%",
-    minHeight: "120px",
-    borderRadius: "8px",
-    padding: "12px",
-    fontSize: "14px",
-    border: "1px solid #e5e7eb",
-    marginBottom: "16px",
-    resize: "vertical",
-  },
-  buttonGradient: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "linear-gradient(to right, #6366f1, #c084fc)",
-    color: "white",
-    padding: "12px",
-    border: "none",
-    borderRadius: "8px",
-    width: "100%",
-    fontSize: "14px",
-    fontWeight: "600",
-    cursor: "pointer",
-  },
-    topText: {
-    fontSize: "20px",
-    fontWeight: "bold",
-    marginBottom: "30px",
-    color: "#6366f1",
-  },
-  progressBar: {
-    width: "100%",
-    height: "30px",
-    backgroundColor: "#f3f3f3",
-    borderRadius: "25px",
-    overflow: "hidden",
-    border: "2px solid #555",
-  },
-  fill: {
-    height: "100%",
-    background: "linear-gradient(to right, #6366f1, #c084fc)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    color: "#fff",
-    fontWeight: "bold",
-    transition: "width 0.4s ease-in-out",
-  },
-
-  jobTitle: {
-    fontSize: 24,
-    marginBottom: 10,
-    color: "#2c3e50",
-  },
-  jobDesc: {
-    fontSize: 16,
-    marginBottom: 20,
-    color: "#34495e",
-  },
-  toggleContainer: {
-    display: "flex",
-    gap: "20px",
-    marginBottom: 20,
-  },
-  toggleLabel: {
-    fontSize: 16,
-    color: "#2c3e50",
-  },
-  textarea: {
-    width: "100%",
-    minHeight: 250,
-    borderRadius: 8,
-    padding: 15,
-    fontSize: 16,
-    border: "1px solid #ccc",
-    resize: "vertical",
-    backgroundColor: "#ffffff",
-    outline: "none",
-  },
-  buttonGroup: {
-    marginBottom: 20,
-  },
-  button: {
-    padding: "10px 20px",
-    marginRight: 10,
-    borderRadius: 8,
-    border: "none",
-    cursor: "pointer",
-    backgroundColor: "#3498db",
-    color: "#fff",
-    fontSize: 16,
-  },
-  transcriptBox: {
-    marginTop: 20,
-    marginBottom: 20,
-    padding: 10,
-    backgroundColor: "#ecf0f1",
-    borderRadius: 8,
-  },
-};
 
 const Card = ({ children }) => <div style={styles.card}>{children}</div>;
 const CardContent = ({ children }) => <div>{children}</div>;
@@ -214,9 +32,10 @@ const HRPortalDashboard = () => {
   // Filtering
   const [minScore, setMinScore] = useState("");
   const [minExp, setMinExp] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Pagination
-  const PAGE_SIZE = 10;
+  const PAGE_SIZE = 5;
   const matchRate = 75;
   const [page, setPage] = useState(1);
 
@@ -226,10 +45,10 @@ const HRPortalDashboard = () => {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
 
-   let recognition;
+  let recognition;
 
 
-   if ("webkitSpeechRecognition" in window) {
+  if ("webkitSpeechRecognition" in window) {
     recognition = new window.webkitSpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
@@ -309,22 +128,35 @@ const HRPortalDashboard = () => {
     document.body.removeChild(link);
   };  
 
-  
+const handleResumeDownload = async (resumeId, filename = "resume.pdf") => {
+  try {
+    const response = await axios.get(`${BASE_URL}/download_resume/${resumeId}`, {
+      responseType: "blob",
+    });
+    fileDownload(response.data, filename);
+  } catch (err) {
+    console.error("Download failed", err);
+    toast.error("Failed to download resume.");
+  }
+};
+
+const fetchResumeCount = async () => {
+  try {
+    const res = await axios.get(`${BASE_URL}/resume_count`);
+    setResumeCount(res.data.count || 0);
+    console.log("Fetched resume count:", res.data.count);
+  } catch (err) {
+    // if(isMounted) {
+      toast.error(`Failed to fetch resume count: ${err}`);
+    // }
+  }
+};
+
+
   useEffect(() => {
-  const fetchResumeCount = async () => {
-    try {
-      const res = await axios.get(`${BASE_URL}/resume_count`);
-      setResumeCount(res.data.count || 0);
-      console.log("Fetched resume count:", res.data.count);
-    } catch (err) {
-      console.error("Failed to fetch resume count", err);
-    }
-  };
-
   fetchResumeCount();
-}, [resumeCount]);
+}, []);
 
- let eventSource; // Declare in outer scope
 
   const handleFileChange = (e) => {
     setSelectedFiles([...e.target.files]);
@@ -334,6 +166,7 @@ const HRPortalDashboard = () => {
   setLoading(true);
   setTableData([]);
   setShowTable(false);
+  setShortListCount(0);
   setTableError("");
   setPage(1);
   setUpdatedCount(0);
@@ -346,6 +179,8 @@ const HRPortalDashboard = () => {
     setLoading(false);
     return;
   }
+
+  let eventSource;
 
   try {
     toast.info("Streaming resume analysis...");
@@ -366,9 +201,7 @@ const HRPortalDashboard = () => {
           toast.success(`${count} resumes processed!`);
           if (results?.length) {
             setTableData(results);
-            for (let i = 0; i < results.length; i++) {
-              if(results[i].score >= matchRate) setShortListCount(prev => prev + 1);
-            }
+            setShortListCount(results.filter(r => r.score >= matchRate).length);
             setShowTable(true);
           } else {
             setTableError("No results found.");
@@ -411,7 +244,48 @@ const HRPortalDashboard = () => {
 
   const paginatedData = useMemo(() => {
     let data = [...tableData];
+  
+    // Search filter
+    if (searchQuery) {
+      data = data.filter((r) =>
+        (r.filename || "").toLowerCase().includes(searchQuery) ||
+        (r.email || "").toLowerCase().includes(searchQuery)
+      );
+    }
+  
+    // Score filter
+    if (minScore !== "") {
+      const ms = Number(minScore);
+      if (!isNaN(ms)) data = data.filter((r) => (r.score ?? 0) >= ms);
+    }
+  
+    // Experience filter
+    if (minExp !== "") {
+      const me = Number(minExp);
+      if (!isNaN(me)) data = data.filter((r) => (r.experience ?? 0) >= me);
+    }
+  
+    // Sorting
+    data.sort((a, b) => {
+      const aVal = Number(a[sortKey] ?? 0);
+      const bVal = Number(b[sortKey] ?? 0);
+      return sortOrder === "asc" ? aVal - bVal : bVal - aVal;
+    });
+  
+    const start = (page - 1) * PAGE_SIZE;
+    return data.slice(start, start + PAGE_SIZE);
+  }, [tableData, searchQuery, minScore, minExp, sortKey, sortOrder, page]);  
 
+  const totalPages = useMemo(() => {
+    let data = [...tableData];
+  
+    if (searchQuery) {
+      data = data.filter((r) =>
+        (r.filename || "").toLowerCase().includes(searchQuery) ||
+        (r.email || "").toLowerCase().includes(searchQuery) 
+      );
+    }
+  
     if (minScore !== "") {
       const ms = Number(minScore);
       if (!isNaN(ms)) data = data.filter((r) => (r.score ?? 0) >= ms);
@@ -420,33 +294,14 @@ const HRPortalDashboard = () => {
       const me = Number(minExp);
       if (!isNaN(me)) data = data.filter((r) => (r.experience ?? 0) >= me);
     }
-
-    data.sort((a, b) => {
-      const aVal = Number(a[sortKey] ?? 0);
-      const bVal = Number(b[sortKey] ?? 0);
-      return sortOrder === "asc" ? aVal - bVal : bVal - aVal;
-    });
-
-    const start = (page - 1) * PAGE_SIZE;
-    return data.slice(start, start + PAGE_SIZE);
-  }, [tableData, minScore, minExp, sortKey, sortOrder, page]);
-
-  const totalPages = useMemo(() => {
-    let count = tableData.length;
-    if (minScore !== "") {
-      const ms = Number(minScore);
-      if (!isNaN(ms)) count = tableData.filter((r) => (r.score ?? 0) >= ms).length;
-    }
-    if (minExp !== "") {
-      const me = Number(minExp);
-      if (!isNaN(me)) count = tableData.filter((r) => (r.experience ?? 0) >= me).length;
-    }
-    return Math.max(1, Math.ceil(count / PAGE_SIZE));
-  }, [tableData, minScore, minExp]);
+  
+    return Math.max(1, Math.ceil(data.length / PAGE_SIZE));
+  }, [tableData, searchQuery, minScore, minExp]);
+  
 
 
   const headers = ["filename", "score", "remarks"];
-  const tdStyle = { padding: "12px", borderBottom: "1px solid #eee" };
+  // const tdStyle = { padding: "12px", borderBottom: "1px solid #eee" };
 
 
   const handleUpload = async () => {
@@ -469,7 +324,7 @@ const HRPortalDashboard = () => {
       });
 
       toast.success(res.data.message || "Files uploaded successfully!");
-      setResumeCount();
+      fetchResumeCount();
       setSelectedFiles([]);
       if (fileInputRef.current) fileInputRef.current.value = null;
     } catch (error) {
@@ -480,15 +335,12 @@ const HRPortalDashboard = () => {
     } finally {
       setUploading(false);
     }
-
-
-    
-
   };
 
-
-
-  
+  const handleSearch = (query) => {
+    setSearchQuery(query.toLowerCase().trim());
+    setPage(1); // reset pagination on search
+  };  
 
   return (
     
@@ -625,7 +477,7 @@ const HRPortalDashboard = () => {
             <button
               onClick={stopListening}
               disabled={!isListening}
-              style={{ ...styles.button, backgroundColor: "#c0392b" }}
+              style={{ ...styles.button, backgroundColor: "#000" }}
             >
               🛑 Stop Listening
             </button>
@@ -649,43 +501,17 @@ const HRPortalDashboard = () => {
         >
           🔍 Shortlist Candidates
         </button>
-      </div>
+    </div>
 
-    <div style={styles.jobSection}> 
-  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-    <div>
-      <h2 style={{ fontSize: "20px", fontWeight: "bold", color: "#1e40af" }}>👥 Candidates</h2>
-      <p style={styles.cardText}>Review and manage candidate profiles</p>
-    </div>
-    <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-      <input
-        type="text"
-        placeholder="🔍 Search candidates..."
-        style={{
-          padding: "10px 12px",
-          borderRadius: "8px",
-          border: "1px solid #e5e7eb",
-          fontSize: "14px",
-          minWidth: "200px",
-        }}
-      />
-      <button
-        onClick={handleDownload}
-        style={{
-          background: "linear-gradient(to right, #34d399, #10b981)",
-          color: "#fff",
-          padding: "10px 16px",
-          borderRadius: "8px",
-          fontWeight: "600",
-          fontSize: "14px",
-          border: "none",
-          cursor: "pointer",
-        }}
-      >
-        ⬇️ Download CSV
-      </button>
-    </div>
-  </div>
+    <div style={
+      {
+        backgroundColor: "#ffffff",
+        borderRadius: "12px",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+        padding: (loading || showTable) ? "24px" : "0px",
+        marginBottom: "32px",
+      }
+    }> 
 
   {/* Show loading progress only when loading */}
   {loading && (
@@ -725,17 +551,45 @@ const HRPortalDashboard = () => {
     </div>
   )}
 
-  {/* Show this only when not loading */}
-  {!loading &&  !showTable && (
-    <div style={{ textAlign: "center", padding: "40px 0", color: "#9ca3af" }}>
-      <div style={{ fontSize: "32px", marginBottom: "8px" }}>👤</div>
-      <p style={{ fontWeight: "600", fontSize: "16px" }}>No candidates found</p>
-      <p style={styles.cardText}>Upload resumes to get started</p>
-    </div>
-  )}
    {/* Table & Filters */}
 {showTable && (
   <>
+    {/* Search bar and download csv */}
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+      <div>
+        <h2 style={{ fontSize: "20px", fontWeight: "bold", color: "#1e40af" }}>👥 Candidates</h2>
+        <p style={styles.cardText}>Review and manage candidate profiles</p>
+      </div>
+      <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+        <input
+          type="text"
+          placeholder="🔍 Search candidates..."
+          onChange={(e) => handleSearch(e.target.value)}
+          style={{
+            padding: "10px 12px",
+            borderRadius: "8px",
+            border: "1px solid #e5e7eb",
+            fontSize: "14px",
+            minWidth: "200px",
+          }}
+        />
+        <button
+          onClick={handleDownload}
+          style={{
+            background: "linear-gradient(to right, #34d399, #10b981)",
+            color: "#fff",
+            padding: "10px 16px",
+            borderRadius: "8px",
+            fontWeight: "600",
+            fontSize: "14px",
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
+          ⬇️ Download CSV
+        </button>
+      </div>
+    </div>
     {/* Filters & Sort */}
     <div style={{
       margin: "24px",
@@ -859,7 +713,25 @@ const HRPortalDashboard = () => {
           <tbody>
             {paginatedData.map((row, idx) => (
               <tr key={idx} style={{ backgroundColor: idx % 2 === 0 ? "#fdfdfd" : "#f7f9fc" }}>
-                <td style={{ padding: 10, fontSize: "14px", color: "#2c3e50" }}>{row.filename}</td>
+                <td style={{ padding: 10, fontSize: "14px", color: "#2c3e50", display: "flex", alignItems: "center", gap: 8 }}>
+                  {row.filename}
+                  {row.resume_id && (
+                    <button
+                      onClick={() => handleResumeDownload(row.resume_id, row.filename)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        padding: 0,
+                        margin: 0,
+                        color: "#1e40af",
+                      }}
+                      title="Download Resume"
+                    >
+                      <FiDownload size={18} />
+                    </button>
+                  )}
+                </td>
                 <td style={{ padding: 10 }}>
                   <div style={{
                     position: "relative",

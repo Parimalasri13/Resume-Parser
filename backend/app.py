@@ -14,8 +14,10 @@ from flask_cors import CORS
 from pymongo import MongoClient
 from bson import ObjectId
 import gridfs
-from flask import Response
+from flask import send_file, Response
 import threading
+from bson import ObjectId
+import io
 
 # Global variable to store progress messages
 progress_messages = []
@@ -254,7 +256,8 @@ def process_resumes_from_db(job_description: str) -> List[Dict]:
                     "remarks": resume_response.get("remarks"),
                     "phone": resume_response.get("phone"),
                     "email": resume_response.get("email"),
-                    "experience": resume_response.get("experience")
+                    "experience": resume_response.get("experience"),
+                    "resume_id": str(resume["_id"])
                 }
                 results.append(result)
                 send_progress(json.dumps({"status":"progress","message":f"Done processing {filename}","done":i+1,"total":total}))
@@ -269,16 +272,17 @@ def process_resumes_from_db(job_description: str) -> List[Dict]:
         "results": results
     }))
 
-@app.route('/resume_count')
-def resume_count():
-    return jsonify({"count": resumes_collection.count_documents({})})
-
 
 def send_progress(message: str):
     with progress_lock:
         progress_messages.append(message)
 
 # Flask Routes
+@app.route('/resume_count')
+def resume_count():
+    return jsonify({"count": resumes_collection.count_documents({})})
+
+
 @app.route("/progress_stream")
 def progress_stream():
     def event_stream():
@@ -422,6 +426,33 @@ def delete_resume(resume_id):
         return jsonify({"message": "Resume deleted successfully"})
     except Exception as e:
         return jsonify({"error": f"Failed to delete resume: {str(e)}"}), 500
+
+
+@app.route("/download_resume/<resume_id>", methods=["GET"])
+def download_resume(resume_id):
+    try:
+        # Step 1: Look up resume document to get file_id
+        resume_doc = resumes_collection.find_one({"_id": ObjectId(resume_id)})
+        if not resume_doc or "file_id" not in resume_doc:
+            return {"error": "Resume not found or missing file_id"}, 404
+
+        file_id = resume_doc["file_id"]
+
+        # Step 2: Use GridFS to get the file
+        file_obj = fs.get(file_id)
+
+        # Step 3: Send file
+        return send_file(
+            io.BytesIO(file_obj.read()),
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name=file_obj.filename 
+        )
+
+    except gridfs.errors.NoFile:
+        return {"error": "File not found in GridFS"}, 404
+    except Exception as e:
+        return {"error": f"Failed to download file: {str(e)}"}, 500
 
 
 @app.errorhandler(404)

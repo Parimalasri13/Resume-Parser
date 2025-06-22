@@ -52,9 +52,10 @@ const Navbar = () => {
   const location = useLocation();
 
   const linkStyle = (path) => ({
-    color: location.pathname === path ? "#ffffff" : "#cbd5e1",
+    color: location.pathname === path ? "#ffffff" : "#6b7280",
     textDecoration: "none",
     padding: "10px 16px",
+    margin: "0 4px",
     borderRadius: "8px",
     backgroundColor: location.pathname === path ? "#1e40af" : "transparent",
     transition: "background-color 0.3s ease",
@@ -77,9 +78,10 @@ const Navbar = () => {
     >
       <h2 style={{ color: "#1e40af", margin: 0, fontSize: "20px" }}>HR Portal</h2>
       <div>
-        {/* <Link to="/" style={linkStyle("/")}>Home</Link>
-        <Link to="/upload-resume" style={linkStyle("/upload-resume")}>Upload Resume</Link> */}
+        {/* <Link to="/home" style={linkStyle("/home")}>Home</Link> */}
+        {/* <Link to="/upload-resume" style={linkStyle("/upload-resume")}>Upload Resume</Link> */}
         <Link to="/" style={linkStyle("/")}>Dashboard</Link>
+        <Link to="/resumes" style={linkStyle("/resumes")}>Resumes</Link>
       </div>
     </nav>
   );
