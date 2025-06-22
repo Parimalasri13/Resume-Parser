@@ -344,7 +344,8 @@ def process_resumes_from_db(job_description: str) -> List[Dict]:
                     "remarks": resume_response.get("remarks"),
                     "phone": resume_response.get("phone"),
                     "email": resume_response.get("email"),
-                    "experience": resume_response.get("experience")
+                    "experience": resume_response.get("experience"),
+                    "resume_id": str(resume["_id"])
                 }
                 results.append(result)
                 send_progress(json.dumps({"status":"progress","message":f"Done processing {filename}","done":i+1,"total":total}))
