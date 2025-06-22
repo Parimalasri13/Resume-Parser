@@ -4,7 +4,7 @@ import React, { useState, useRef, useMemo, useEffect } from "react";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import { Typewriter } from "react-simple-typewriter";
-import { FiDownload } from "react-icons/fi"; // install react-icons if not already
+import { FaDownload } from "react-icons/fa";
 import fileDownload from "js-file-download"; // install js-file-download if not already
 import "react-toastify/dist/ReactToastify.css";
 import styles from "../components/Styles";
@@ -613,7 +613,7 @@ const fetchResumeCount = async () => {
     </div>
     {/* Filters & Sort */}
     <div style={{
-      margin: "24px",
+      margin: "24px 0px",
       display: "flex",
       gap: 16,
       alignItems: "center",
@@ -704,7 +704,7 @@ const fetchResumeCount = async () => {
     </div>
 
     {/* Table */}
-    <div style={styles.jobSection}>
+    <div style={styles.tableSection}>
       <h3 style={{ color: "#1e40af", marginBottom: 20 }}>Processed Resume Results</h3>
       {tableError && <p style={{ color: "red" }}>{tableError}</p>}
       <div style={{ overflowX: "auto" }}>
@@ -722,9 +722,6 @@ const fetchResumeCount = async () => {
                 <th key={h} style={{
                   padding: 12,
                   textAlign: "left",
-                  borderBottom: "2px solid #ddd",
-                  ...(i === 0 && { borderTopLeftRadius: 12 }),
-                  ...(i === headers.length - 1 && { borderTopRightRadius: 12 })
                 }}>
                   {h.charAt(0).toUpperCase() + h.slice(1)}
                 </th>
@@ -734,23 +731,26 @@ const fetchResumeCount = async () => {
           <tbody>
             {paginatedData.map((row, idx) => (
               <tr key={idx} style={{ backgroundColor: idx % 2 === 0 ? "#fdfdfd" : "#f7f9fc" }}>
-                <td style={{ padding: 10, fontSize: "14px", color: "#2c3e50", display: "flex", alignItems: "center", gap: 8 }}>
-                  {row.filename}
+                <td style={{ padding: 10, fontSize: "14px", color: "#2c3e50", display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div>{row.filename}</div>
                   {row.resume_id && (
-                    <button
-                      onClick={() => handleResumeDownload(row.resume_id, row.filename)}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        padding: 0,
-                        margin: 0,
-                        color: "#1e40af",
-                      }}
-                      title="Download Resume"
-                    >
-                      <FiDownload size={18} />
-                    </button>
+                    <div>
+                      <button
+                        onClick={() => handleResumeDownload(row.resume_id, row.filename)}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          padding: 0,
+                          margin: 0,
+                          color: "#1e40af",
+                          fontSize: "16px"
+                        }}
+                        title="Download Resume"
+                      >
+                        <FaDownload />
+                      </button>
+                    </div>
                   )}
                 </td>
                 <td style={{ padding: 10 }}>

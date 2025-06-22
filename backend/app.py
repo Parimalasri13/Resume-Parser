@@ -265,6 +265,17 @@ def process_resumes_from_db(job_description: str) -> List[Dict]:
                 send_progress(json.dumps({"status":"progress","message":f"Unable to process {filename}", "done":i+1,"total":total}))
         except Exception as e:
             send_progress(json.dumps({"status":"failed","message":f"Error processing {filename}: {str(e)}", "done":i+1,"total":total}))
+    
+    #store results in rankings table
+    if results:
+        ranking_doc = {
+            "job_description": job_description,
+            "results": results,
+            "created_at": datetime.utcnow()
+        }
+        rankings_collection.insert_one(ranking_doc)
+        print(f"Stored ranking results for {len(results)} resumes")
+
     # send final results
     send_progress(json.dumps({
         "status": "complete",

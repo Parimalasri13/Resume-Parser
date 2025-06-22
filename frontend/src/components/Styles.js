@@ -68,6 +68,10 @@ const Styles = {
       padding: "24px",
       marginBottom: "32px",
     },
+    tableSection: {
+      padding: "20px 0px",
+      marginBottom: "32px",
+    },
     jobTitle: {
       fontSize: "20px",
       fontWeight: "bold",
