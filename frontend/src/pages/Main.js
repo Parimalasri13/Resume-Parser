@@ -8,7 +8,7 @@ import { FiDownload } from "react-icons/fi"; // install react-icons if not alrea
 import fileDownload from "js-file-download"; // install js-file-download if not already
 import "react-toastify/dist/ReactToastify.css";
 import styles from "../components/Styles";
-import ChatWidget from "../components/ChatWidget"; 
+import ChatWidget from '../components/ChatWidget';
 import "../App.css";
 
 const Card = ({ children }) => <div style={styles.card}>{children}</div>;
@@ -438,7 +438,7 @@ const fetchResumeCount = async () => {
         <h2 style={styles.jobTitle}>📄 Job Description</h2>
         <p style={styles.jobDesc}>Paste the job description to intelligently match candidates</p>
         
-         <div style={styles.toggleContainer}>
+        <div style={styles.toggleContainer}>
         <label style={styles.toggleLabel}>
           <input
             type="radio"
