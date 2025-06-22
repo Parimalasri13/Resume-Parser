@@ -421,7 +421,7 @@ const fetchResumeCount = async () => {
               style={{
                 padding: "8px",
                 background: "#1e293b",
-                border: "1px solidrgb(15, 16, 16)",
+                border: "1px solid #64748b",
                 borderRadius: "6px",
                 fontSize: "24px",
                 fontWeight: 600,
