@@ -1,7 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Home from './pages/Home'; // You should create corresponding page components
-import UploadResume from './pages/UploadResume';
 import Navbar from './components/NavBar';
 import Main from './pages/Main';
 import ListResumes from './pages/Resumes';
