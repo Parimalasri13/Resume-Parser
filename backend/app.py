@@ -114,6 +114,7 @@ def extract_resume_json(resume_text, source_name=""):
         '"contactInfo", "education", "experience", "projects", "technicalSkills", '
         '"certifications", "extraCurriculars", "achievements". '
         "Do NOT include any markdown, commentary, or trailing commas."
+        
     )
     user_msg = f"Parse the following resume text into JSON:\n\n{resume_text}"
 
