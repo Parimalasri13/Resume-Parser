@@ -36,7 +36,8 @@ const ChatWidget = () => {
             style={{
               ...styles.message,
               alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
-              backgroundColor: msg.role === "user" ? "#DCF8C6" : "#FFF",
+              backgroundColor: msg.role === "user" ? "#4b5563" : "#334155"
+
             }}
           >
             {msg.content}
@@ -65,17 +66,17 @@ const styles = {
     right: 20,
     width: 300,
     height: 400,
-    backgroundColor: "#f4f6f9",
+    backgroundColor: "#1e293b", // dark navy
     borderRadius: 10,
     display: "flex",
     flexDirection: "column",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
     zIndex: 1000,
     fontFamily: "Segoe UI, sans-serif",
   },
   header: {
     padding: 10,
-    background:  "linear-gradient(to bottom right, #3b82f6, #8b5cf6)",
+    background: "linear-gradient(to bottom right, #6366f1, #8b5cf6)",
     color: "#fff",
     borderTopLeftRadius: 10,
     borderTopRightRadius: 10,
@@ -93,17 +94,19 @@ const styles = {
     padding: 10,
     display: "flex",
     gap: 5,
-    borderTop: "1px solid #ccc",
+    borderTop: "1px solid #334155",
   },
   input: {
     flex: 1,
     padding: 8,
     borderRadius: 5,
-    border: "1px solid #ccc",
+    border: "1px solid #475569",
+    backgroundColor: "#0f172a",
+    color: "#f1f5f9",
   },
   sendButton: {
     padding: "8px 12px",
-    background: "linear-gradient(to bottom right, #3b82f6, #8b5cf6)",
+    background: "linear-gradient(to bottom right, #6366f1, #8b5cf6)",
     color: "#fff",
     border: "none",
     borderRadius: 5,
@@ -113,7 +116,10 @@ const styles = {
     padding: 8,
     borderRadius: 8,
     maxWidth: "80%",
+    color: "#f1f5f9",
+    backgroundColor: "#334155",
   },
 };
+
 
 export default ChatWidget;

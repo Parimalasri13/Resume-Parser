@@ -4,12 +4,14 @@ import React, { useState, useRef, useMemo, useEffect } from "react";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import { Typewriter } from "react-simple-typewriter";
-import { FiDownload } from "react-icons/fi"; // install react-icons if not already
+import { FiDownload } from "react-icons/fi"; 
+import { FaDownload, FaTrash } from "react-icons/fa";// install react-icons if not already
 import fileDownload from "js-file-download"; // install js-file-download if not already
 import "react-toastify/dist/ReactToastify.css";
 import styles from "../components/Styles";
 import ChatWidget from '../components/ChatWidget';
 import "../App.css";
+
 
 
 const Card = ({ children }) => <div style={styles.card}>{children}</div>;
@@ -27,6 +29,7 @@ const HRPortalDashboard = () => {
   const [showTable, setShowTable] = useState(false);
   const [inputMode, setInputMode] = useState("text");
   const [showChat, setShowChat] = useState(false);
+  const recognitionRef = useRef(null);
   
 
   // Sorting
@@ -49,6 +52,27 @@ const HRPortalDashboard = () => {
   const [matchRate, setMatchRate] = useState(75);
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
+
+
+  useEffect(() => {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const recognition = new SpeechRecognition();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+
+  recognitionRef.current = recognition;
+
+  recognition.onresult = (event) => {
+    // handle results
+  };
+
+  recognition.onend = () => {
+    // do not restart here if stopListening was triggered
+    if (isListening) {
+      recognition.start();
+    }
+  };
+}, []);
 
   let recognition;
 
@@ -83,12 +107,13 @@ const HRPortalDashboard = () => {
     }
   };
 
-  const stopListening = () => {
-    if (recognition) {
-      recognition.stop();
-      setIsListening(false);
-    }
-  };
+ const stopListening = () => {
+  if (recognitionRef.current) {
+    recognitionRef.current.stop();
+    setIsListening(false);
+  }
+};
+
 
   
 
@@ -101,7 +126,8 @@ const HRPortalDashboard = () => {
       row.remarks?.replace(/\n/g, ' ') || '',
       row.phone || '',
       row.email || '',
-      row.experience !== null ? `${row.experience} yrs` : ''
+      row.experience !== null ? `${row.experience} yrs` : '',
+      row.resume_id || ''
     ]);
   
     const csvContent = [csvHeaders, ...rows]
@@ -135,7 +161,13 @@ const HRPortalDashboard = () => {
 
 const handleResumeDownload = async (resumeId, filename = "resume.pdf") => {
   try {
-    const response = await axios.get(`${BASE_URL}/download_resume/${resumeId}`, {
+    if (!resumeId) {
+      toast.error("Invalid resume ID.");
+      return;
+    }
+    const
+      // Ensure filename is safe
+     response = await axios.get(`${BASE_URL}/download_resume/${resumeId}`, {
       responseType: "blob",
     });
     fileDownload(response.data, filename);
@@ -530,7 +562,8 @@ const fetchResumeCount = async () => {
 
     <div style={
       {
-        backgroundColor: "#ffffff",
+        border: "1px solid #64748b",
+        background: "#1e293b",
         borderRadius: "12px",
         boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
         padding: (loading || showTable) ? "24px" : "0px",
@@ -580,280 +613,186 @@ const fetchResumeCount = async () => {
 {showTable && (
   <>
     {/* Search bar and download csv */}
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-      <div>
-        <h2 style={{ fontSize: "20px", fontWeight: "bold", color: "#1e40af" }}>👥 Candidates</h2>
-        <p style={styles.cardText}>Review and manage candidate profiles</p>
-      </div>
-      <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-        <input
-          type="text"
-          placeholder="🔍 Search candidates..."
-          onChange={(e) => handleSearch(e.target.value)}
-          style={{
-            padding: "10px 12px",
-            borderRadius: "8px",
-            border: "1px solid #e5e7eb",
-            fontSize: "14px",
-            minWidth: "200px",
-          }}
-        />
-        <button
-          onClick={handleDownload}
-          style={{
-            background: "linear-gradient(to right, #34d399, #10b981)",
-            color: "#fff",
-            padding: "10px 16px",
-            borderRadius: "8px",
-            fontWeight: "600",
-            fontSize: "14px",
-            border: "none",
-            cursor: "pointer",
-          }}
-        >
-          ⬇️ Download CSV
-        </button>
-      </div>
-    </div>
-    {/* Filters & Sort */}
-    <div style={{
-      margin: "24px",
-      display: "flex",
-      gap: 16,
-      alignItems: "center",
-      flexWrap: "wrap",
-      justifyContent: "space-between"
-    }}>
-      <div style={{ display: "flex", gap: 12, alignItems: "center", flex:1 }}>
-        <label style={{ color: "#2c3e50", fontWeight: 500 }}>
-          Min Score:&nbsp;
-          <input
-            type="number"
-            value={minScore}
-            onChange={(e) => { setMinScore(e.target.value); setPage(1); }}
-            onWheel={(e) => e.currentTarget.blur()}
-            min="0"
-            max="100"
-            placeholder="0"
-            style={{
-              width: 60,
-              padding: 6,
-              borderRadius: 6,
-              border: "1px solid #d1d5db",
-              fontSize: "14px"
-            }}
-          />
-        </label>
-        <label style={{ color: "#2c3e50", fontWeight: 500 }}>
-          Min Exp:&nbsp;
-          <input
-            type="number"
-            value={minExp}
-            onChange={(e) => { setMinExp(e.target.value); setPage(1); }}
-            onWheel={(e) => e.currentTarget.blur()}
-            min="0"
-            placeholder="0"
-            style={{
-              width: 60,
-              padding: 6,
-              borderRadius: 6,
-              border: "1px solid #d1d5db",
-              fontSize: "14px"
-            }}
-          />
-        </label>
-      </div>
-      <div style={{ display: "flex", gap: 12, alignItems: "center", flex: 1, justifyContent: "flex-end" }}>
-        <label style={{ color: "#2c3e50", fontWeight: 500 }}>
-          Sort by:&nbsp;
-          <select
-            value={sortKey}
-            onChange={(e) => setSortKey(e.target.value)}
-            style={{
-            padding: "6px 12px",
-            borderRadius: 6,
-            border: "none",
-            background: "#1e40af",
-            color: "#fff",
-            fontWeight: 600,
-            cursor: "pointer",
-            boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)"
-          }}
+    <div style={styles.candidateHeader}>
+  <div>
+    <h2 style={styles.candidateTitle}>👥 Candidates</h2>
+    <p style={styles.cardText}>Review and manage candidate profiles</p>
+  </div>
+  <div style={styles.candidateControls}>
+    <input
+      type="text"
+      placeholder="🔍 Search candidates..."
+      onChange={(e) => handleSearch(e.target.value)}
+      style={styles.searchInput}
+    />
+    <button
+      onClick={handleDownload}
+      style={styles.csvDownloadButton}
+    >
+      ⬇️ Download CSV
+    </button>
+  </div>
 
-          >
-            <option value="score">Score</option>
-            <option value="experience">Experience</option>
-          </select>
-        </label>
-        <label style={{ color: "#2c3e50", fontWeight: 500 }}>
-          Order:&nbsp;
-          <select
-            value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value)}
-            style={{
-              padding: "6px 12px",
-              borderRadius: 6,
-              border: "1px solid #2c3e50",
-              background: "#1e40af",
-              color: "#fff",
-              fontWeight: 500,
-              cursor: "pointer"
-            }}
-          >
-            <option value="asc">Ascending</option>
-            <option value="desc">Descending</option>
-          </select>
-        </label>
-      </div>
-    </div>
+  </div>
+    {/* Filters & Sort */}
+  <div style={styles.filterSortContainer}>
+  <div style={styles.filterControls}>
+    <label style={styles.label}>
+      Min Score:&nbsp;
+      <input
+        type="number"
+        value={minScore}
+        onChange={(e) => { setMinScore(e.target.value); setPage(1); }}
+        onWheel={(e) => e.currentTarget.blur()}
+        min="0"
+        max="100"
+        placeholder="0"
+        style={styles.input}
+      />
+    </label>
+    <label style={styles.label}>
+      Min Exp:&nbsp;
+      <input
+        type="number"
+        value={minExp}
+        onChange={(e) => { setMinExp(e.target.value); setPage(1); }}
+        onWheel={(e) => e.currentTarget.blur()}
+        min="0"
+        placeholder="0"
+        style={styles.input}
+      />
+    </label>
+  </div>
+
+  <div style={styles.sortControls}>
+    <label style={styles.label}>
+      Sort by:&nbsp;
+      <select
+        value={sortKey}
+        onChange={(e) => setSortKey(e.target.value)}
+        style={styles.select}
+      >
+        <option value="score">Score</option>
+        <option value="experience">Experience</option>
+      </select>
+    </label>
+    <label style={styles.label}>
+      Order:&nbsp;
+      <select
+        value={sortOrder}
+        onChange={(e) => setSortOrder(e.target.value)}
+        style={styles.select}
+      >
+        <option value="asc">Ascending</option>
+        <option value="desc">Descending</option>
+      </select>
+    </label>
+  </div>
+</div>
+
 
     {/* Table */}
-    <div style={styles.jobSection}>
-      <h3 style={{ color: "#1e40af", marginBottom: 20 }}>Processed Resume Results</h3>
-      {tableError && <p style={{ color: "red" }}>{tableError}</p>}
-      <div style={{ overflowX: "auto" }}>
-        <table style={{
-          width: "100%",
-          borderCollapse: "separate",
-          borderSpacing: 0,
-          // borderRadius: 12,
-          overflow: "hidden",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.05)"
-        }}>
-          <thead style={{ backgroundColor: "#1e40af ", color: "#fff" }}>
-            <tr>
-              {headers.map((h, i) => (
-                <th key={h} style={{
-                  padding: 12,
-                  textAlign: "left",
-                  borderBottom: "2px solid #ddd",
-                  ...(i === 0 && { borderTopLeftRadius: 12 }),
-                  ...(i === headers.length - 1 && { borderTopRightRadius: 12 })
-                }}>
-                  {h.charAt(0).toUpperCase() + h.slice(1)}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedData.map((row, idx) => (
-              <tr key={idx} style={{ backgroundColor: idx % 2 === 0 ? "#fdfdfd" : "#f7f9fc" }}>
-                <td style={{ padding: 10, fontSize: "14px", color: "#2c3e50", display: "flex", alignItems: "center", gap: 8 }}>
-                  {row.filename}
-                  {row.resume_id && (
-                    <button
-                      onClick={() => handleResumeDownload(row.resume_id, row.filename)}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        padding: 0,
-                        margin: 0,
-                        color: "#1e40af",
-                      }}
-                      title="Download Resume"
-                    >
-                      <FiDownload size={18} />
-                    </button>
-                  )}
-                </td>
-                <td style={{ padding: 10 }}>
-                  <div style={{
-                    position: "relative",
-                    background: "#e0e0e0",
-                    borderRadius: 10,
-                    overflow: "hidden",
-                    height: 20,
-                    width: 100
-                  }}>
-                    <div style={{
-                      width: `${row.score || 0}%`,
-                      background: row.score >= 75 ? "#27ae60" : row.score >= 50 ? "#f39c12" : "#e74c3c",
-                      height: "100%"
-                    }} />
-                    <div style={{
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      height: "100%",
-                      width: "100%",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "#2c3e50",
-                      fontWeight: "bold"
-                    }}>
-                      {row.score}%
-                    </div>
-                  </div>
-                </td>
-                <td style={{ padding: 10, fontSize: "14px", color: "#2c3e50", whiteSpace: "pre-wrap" }}>
-                  {row.remarks}
-                  {row.phone && <p><strong>Phone:</strong> {row.phone}</p>}
-                  {row.email && <p><strong>Email:</strong> {row.email}</p>}
-                  {row.experience != null && <p><strong>Exp:</strong> {row.experience} yrs</p>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+<div style={styles.jobSection}>
+  <h3 style={styles.resumeHeading}>Processed Resume Results</h3>
+  {tableError && <p style={styles.errorText}>{tableError}</p>}
+  <div style={styles.tableWrapper}>
+    <table style={styles.table}>
+      <thead style={styles.tableHead}>
+        <tr>
+          {headers.map((h, i) => (
+            <th key={h} style={styles.tableHeader(i, headers.length)}>
+              {h.charAt(0).toUpperCase() + h.slice(1)}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {paginatedData.map((row, idx) => (
+          <tr key={idx} style={idx % 2 === 0 ? styles.tableRowEven : styles.tableRowOdd}>
+            <td style={styles.filenameCell}>
+              {row.filename}
+              {row.resume_id && (
+                <button
+                  onClick={() => handleResumeDownload(row.resume_id, row.filename)}
+                  style={styles.downloadButton}
+                  title="Download Resume"
+                >
+                  <FaDownload size={18} />
+                </button>
+              )}
+            </td>
+            <td style={styles.scoreCell}>
+              <div style={styles.scoreBarWrapper}>
+                <div
+                  style={{
+                    ...styles.scoreFillBase,
+                    background:
+                      row.score >= 75
+                        ? "#27ae60"
+                        : row.score >= 50
+                        ? "#f39c12"
+                        : "#e74c3c",
+                    width: `${row.score || 0}%`,
+                  }}
+                />
+                <div style={styles.scoreText}>{row.score}%</div>
+              </div>
+            </td>
+            <td style={styles.remarksCell}>
+              {row.remarks}
+              {row.phone && <p><strong>Phone:</strong> {row.phone}</p>}
+              {row.email && <p><strong>Email:</strong> {row.email}</p>}
+              {row.experience != null && <p><strong>Exp:</strong> {row.experience} yrs</p>}
+              {row.resume_id && (
+                <button
+                  onClick={() => handleResumeDownload(row.resume_id, row.filename)}
+                  style={styles.downloadButton}
+                  title="Download Resume"
+                >
+                  <FiDownload size={18} />
+                </button>
+              )}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
 
-      {/* Pagination */}
-      <div style={{
-        display: "flex",
-        justifyContent: "center",
-        gap: 8,
-        marginTop: 20
-      }}>
-        <button
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-          disabled={page === 1}
-          style={{
-            padding: "6px 12px",
-            borderRadius: 4,
-            border: "1px solid #2c3e50",
-            background: "#2c3e50",
-            color: "white",
-            cursor: page === 1 ? "not-allowed" : "pointer"
-          }}
-        >
-          Previous
-        </button>
-        <span style={{ alignSelf: "center", color: "#2c3e50" }}>
-          Page {page} of {totalPages}
-        </span>
-        <button
-          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-          disabled={page === totalPages}
-          style={{
-            padding: "6px 12px",
-            borderRadius: 4,
-            border: "1px solid #2c3e50",
-            background: "#2c3e50",
-            color: "white",
-            cursor: page === totalPages ? "not-allowed" : "pointer"
-          }}
-        >
-          Next
-        </button>
-      </div>
-    </div>
+  <div style={styles.paginationWrapper}>
+    <button
+      onClick={() => setPage((p) => Math.max(1, p - 1))}
+      disabled={page === 1}
+      style={styles.paginationButton(page === 1)}
+    >
+      Previous
+    </button>
+    <span style={styles.paginationInfo}>Page {page} of {totalPages}</span>
+    <button
+      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+      disabled={page === totalPages}
+      style={styles.paginationButton(page === totalPages)}
+    >
+      Next
+    </button>
+  </div>
+</div>
+
   </>
 )}
 
 
 </div>
 
-     <button
-        style={styles.floatingButton}
-        onClick={() => setShowChat((prev) => !prev)}
-      >
-        💬
-      </button>
+  <button
+    style={styles.floatingButton}
+    onClick={() => setShowChat((prev) => !prev)}
+  >
+    💬
+  </button>
 
-      {/* Chat Widget */}
-      {showChat && <ChatWidget />}
+  {/* Chat Widget */}
+  {showChat && <ChatWidget />}
 
 </div>
   );
