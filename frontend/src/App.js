@@ -5,6 +5,7 @@ import UploadResume from './pages/UploadResume';
 import Navbar from './components/NavBar';
 import Main from './pages/Main';
 import ListResumes from './pages/Resumes';
+import ListJobDescriptionResults from './pages/Results';
 
 
 function App() {
@@ -15,6 +16,7 @@ function App() {
         {/* Default route for Home page */}
         <Route path="/" element={<Main />} />
         <Route path="/resumes" element={<ListResumes />} />
+        <Route path='/results' element={<ListJobDescriptionResults />} />
         {/* <Route path="/upload-resume" element={<UploadResume />} /> */}
       </Routes>
       {/* <Footer /> */}

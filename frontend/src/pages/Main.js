@@ -691,7 +691,7 @@ const fetchResumeCount = async () => {
 </div>
 
 
-    {/* Table */}
+    {/* Table */}    
 <div style={styles.jobSection}>
   <h3 style={styles.resumeHeading}>Processed Resume Results</h3>
   {tableError && <p style={styles.errorText}>{tableError}</p>}
