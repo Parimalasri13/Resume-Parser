@@ -1,129 +1,87 @@
 import React, { useState } from "react";
 
 const ChatWidget = () => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [userQuery, setUserQuery] = useState("");
+  const [query, setQuery] = useState("");
   const [messages, setMessages] = useState([]);
 
-  const toggleChat = () => setIsOpen(!isOpen);
-
   const sendQuery = async () => {
-    if (!userQuery.trim()) return;
-
-    const userMessage = { role: "user", content: userQuery };
-    setMessages([...messages, userMessage]);
-    setUserQuery("");
+    if (!query.trim()) return;
+    setMessages((prev) => [...prev, { role: "user", content: query }]);
 
     try {
-      const response = await fetch("http://localhost:5000/query", {
+      const res = await fetch("http://localhost:5000/query", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ query: userQuery }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
       });
-
-      const data = await response.json();
-      const botMessage = { role: "bot", content: data.response || "No response." };
-      setMessages((prev) => [...prev, botMessage]);
+      const data = await res.json();
+      setMessages((prev) => [...prev, { role: "bot", content: data.response }]);
     } catch (err) {
-      setMessages((prev) => [...prev, { role: "bot", content: "❌ Error contacting backend." }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: "bot", content: "❌ Error getting response from server." },
+      ]);
     }
+
+    setQuery("");
   };
 
   return (
-    <>
-      {/* Floating Button */}
-      <button style={styles.floatingButton} onClick={toggleChat}>💬</button>
-
-      {/* Chat Box */}
-      {isOpen && (
-        <div style={styles.chatBox}>
-          <div style={styles.header}>
-            <strong>Resume Chat Assistant</strong>
-            <button onClick={toggleChat} style={styles.closeButton}>✖</button>
+    <div style={styles.chatBox}>
+      <div style={styles.header}>Chat Assistant</div>
+      <div style={styles.body}>
+        {messages.map((msg, i) => (
+          <div
+            key={i}
+            style={{
+              ...styles.message,
+              alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
+              backgroundColor: msg.role === "user" ? "#DCF8C6" : "#FFF",
+            }}
+          >
+            {msg.content}
           </div>
-
-          <div style={styles.messages}>
-            {messages.map((msg, index) => (
-              <div
-                key={index}
-                style={{
-                  ...styles.message,
-                  alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
-                  backgroundColor: msg.role === "user" ? "#DCF8C6" : "#FFF",
-                }}
-              >
-                {msg.content}
-              </div>
-            ))}
-          </div>
-
-          <div style={styles.inputArea}>
-            <input
-              type="text"
-              value={userQuery}
-              onChange={(e) => setUserQuery(e.target.value)}
-              placeholder="Ask a question..."
-              style={styles.input}
-              onKeyDown={(e) => e.key === "Enter" && sendQuery()}
-            />
-            <button onClick={sendQuery} style={styles.sendButton}>➤</button>
-          </div>
-        </div>
-      )}
-    </>
+        ))}
+      </div>
+      <div style={styles.footer}>
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && sendQuery()}
+          placeholder="Type your question..."
+          style={styles.input}
+        />
+        <button onClick={sendQuery} style={styles.sendButton}>Send</button>
+      </div>
+    </div>
   );
 };
 
 const styles = {
-  floatingButton: {
-    position: "fixed",
-    bottom: 20,
-    right: 20,
-    backgroundColor: "#007bff",
-    color: "#fff",
-    border: "none",
-    borderRadius: "50%",
-    width: 60,
-    height: 60,
-    fontSize: 24,
-    cursor: "pointer",
-    boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
-  },
   chatBox: {
     position: "fixed",
-    bottom: 90,
+    bottom: 100,
     right: 20,
     width: 300,
     height: 400,
     backgroundColor: "#f4f6f9",
-    border: "1px solid #ccc",
     borderRadius: 10,
     display: "flex",
     flexDirection: "column",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-    fontFamily: "Segoe UI, sans-serif",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
     zIndex: 1000,
+    fontFamily: "Segoe UI, sans-serif",
   },
   header: {
     padding: 10,
-    backgroundColor: "#007bff",
+    background:  "linear-gradient(to bottom right, #3b82f6, #8b5cf6)",
     color: "#fff",
     borderTopLeftRadius: 10,
     borderTopRightRadius: 10,
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
+    fontWeight: "bold",
   },
-  closeButton: {
-    background: "none",
-    border: "none",
-    color: "#fff",
-    fontSize: 18,
-    cursor: "pointer",
-  },
-  messages: {
+  body: {
     flex: 1,
     padding: 10,
     overflowY: "auto",
@@ -131,32 +89,30 @@ const styles = {
     flexDirection: "column",
     gap: 8,
   },
-  message: {
-    maxWidth: "80%",
-    padding: 8,
-    borderRadius: 8,
-    fontSize: 14,
-  },
-  inputArea: {
+  footer: {
+    padding: 10,
     display: "flex",
+    gap: 5,
     borderTop: "1px solid #ccc",
-    padding: 8,
   },
   input: {
     flex: 1,
     padding: 8,
     borderRadius: 5,
     border: "1px solid #ccc",
-    outline: "none",
   },
   sendButton: {
-    marginLeft: 8,
     padding: "8px 12px",
-    border: "none",
-    backgroundColor: "#007bff",
+    background: "linear-gradient(to bottom right, #3b82f6, #8b5cf6)",
     color: "#fff",
+    border: "none",
     borderRadius: 5,
     cursor: "pointer",
+  },
+  message: {
+    padding: 8,
+    borderRadius: 8,
+    maxWidth: "80%",
   },
 };
 

@@ -8,6 +8,7 @@ import { FiDownload } from "react-icons/fi"; // install react-icons if not alrea
 import fileDownload from "js-file-download"; // install js-file-download if not already
 import "react-toastify/dist/ReactToastify.css";
 import styles from "../components/Styles";
+import ChatWidget from "../components/ChatWidget"; 
 import "../App.css";
 
 const Card = ({ children }) => <div style={styles.card}>{children}</div>;
@@ -24,6 +25,8 @@ const HRPortalDashboard = () => {
   const [tableError, setTableError] = useState("");
   const [showTable, setShowTable] = useState(false);
   const [inputMode, setInputMode] = useState("text");
+  const [showChat, setShowChat] = useState(false);
+  
 
   // Sorting
   const [sortKey, setSortKey] = useState("score");
@@ -820,8 +823,17 @@ const fetchResumeCount = async () => {
 
 </div>
 
-<button style={styles.floatingButton}>💬</button>
-    </div>
+     <button
+        style={styles.floatingButton}
+        onClick={() => setShowChat((prev) => !prev)}
+      >
+        💬
+      </button>
+
+      {/* Chat Widget */}
+      {showChat && <ChatWidget />}
+
+</div>
   );
 };
 

@@ -19,10 +19,10 @@ from flask_cors import CORS
 from pymongo import MongoClient
 from bson import ObjectId
 import gridfs
-from flask import send_file, Response
+from flask import Response
 import threading
-from bson import ObjectId
-import io
+
+
 
 # Global variable to store progress messages
 progress_messages = []
@@ -56,31 +56,22 @@ try:
     db = client[DATABASE_NAME]
     fs = gridfs.GridFS(db)  # For storing PDF files
     resumes_collection = db.resumes  # For storing resume metadata and parsed data
-    rankings_collection = db.rankings  # For storing ranking results
+    rankings_collection = db.rankings 
+    collection = client[DATABASE_NAME][COLLECTION_NAME] # For storing ranking results
+    documents = list(collection.find({"processed": True}))
+    parsed_data = [doc.get("parsed_data") for doc in documents if doc.get("parsed_data")]
+    print(f"✅ Loaded {len(parsed_data)} processed resumes")
     print("Connected to MongoDB successfully")
+    print("🔍 Creating FAISS index...")
+    model = SentenceTransformer("all-MiniLM-L6-v2")
+    texts = [json.dumps(resume, indent=2) for resume in parsed_data]
+    embeddings = model.encode(texts, convert_to_numpy=True)
+    faiss_index = faiss.IndexFlatL2(embeddings.shape[1])
+    faiss_index.add(embeddings)
+    print("✅ FAISS index ready")
 except Exception as e:
     print(f"Failed to connect to MongoDB: {e}")
     client = None
-
-
-parsed_data = []
-faiss_index = None
-texts = []
-model = None
-
-def load_parsed_data_from_mongo():
-    client = MongoClient(MONGO_URI)
-    collection = client[DB_NAME][COLLECTION_NAME]
-    documents = list(collection.find({"processed": True}))
-    return [doc.get("parsed_data") for doc in documents if doc.get("parsed_data")]
-
-def index_resumes_with_faiss(parsed_data, model_name="all-MiniLM-L6-v2"):
-    model = SentenceTransformer(model_name)
-    texts = [json.dumps(resume, indent=2) for resume in parsed_data]
-    embeddings = model.encode(texts, convert_to_numpy=True)
-    index = faiss.IndexFlatL2(embeddings.shape[1])
-    index.add(embeddings)
-    return index, texts, model
 
 def retrieve_top_k_chunks(query, model, index, texts, k=4):
     query_embedding = model.encode([query], convert_to_numpy=True)
@@ -117,27 +108,7 @@ def is_global_query(query):
     keywords = ["how many", "total", "count", "list all", "summary", "give me all"]
     return any(k in query.lower() for k in keywords)
 
-# === Load on Startup ===
-
-def init_data():
-    global parsed_data, faiss_index, texts, model
-    print("📥 Connecting to MongoDB...")
-    client = MongoClient(MONGO_URI)
-    collection = client[DB_NAME][COLLECTION_NAME]
-    documents = list(collection.find({"processed": True}))
-    parsed_data = [doc.get("parsed_data") for doc in documents if doc.get("parsed_data")]
-
-    print("🔍 Indexing resumes with FAISS...")
-    model = SentenceTransformer("all-MiniLM-L6-v2")
-    texts = [json.dumps(resume, indent=2) for resume in parsed_data]
-    embeddings = model.encode(texts, convert_to_numpy=True)
-    faiss_index = faiss.IndexFlatL2(embeddings.shape[1])
-    faiss_index.add(embeddings)
-
-init_data()  # ✅ Call at top-level
-
-
-# === Flask Route ===
+# === API Endpoint ===
 @app.route("/query", methods=["POST"])
 def query_resume():
     data = request.json
@@ -161,7 +132,7 @@ def query_resume():
                 response = query_llama(prompt)
                 return jsonify({"response": response})
 
-        # Fallback: RAG
+        # Fallback: use RAG
         top_chunks = retrieve_top_k_chunks(user_query, model, faiss_index, texts)
         prompt = build_prompt("\n\n".join(top_chunks), user_query)
         response = query_llama(prompt)
@@ -169,7 +140,6 @@ def query_resume():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 def post_with_retries(url: str, headers: Dict, payload: Dict) -> requests.Response:
     """Make API request with exponential backoff retry logic"""
@@ -372,8 +342,7 @@ def process_resumes_from_db(job_description: str) -> List[Dict]:
                     "remarks": resume_response.get("remarks"),
                     "phone": resume_response.get("phone"),
                     "email": resume_response.get("email"),
-                    "experience": resume_response.get("experience"),
-                    "resume_id": str(resume["_id"])
+                    "experience": resume_response.get("experience")
                 }
                 results.append(result)
                 send_progress(json.dumps({"status":"progress","message":f"Done processing {filename}","done":i+1,"total":total}))
@@ -388,17 +357,16 @@ def process_resumes_from_db(job_description: str) -> List[Dict]:
         "results": results
     }))
 
+@app.route('/resume_count')
+def resume_count():
+    return jsonify({"count": resumes_collection.count_documents({})})
+
 
 def send_progress(message: str):
     with progress_lock:
         progress_messages.append(message)
 
 # Flask Routes
-@app.route('/resume_count')
-def resume_count():
-    return jsonify({"count": resumes_collection.count_documents({})})
-
-
 @app.route("/progress_stream")
 def progress_stream():
     def event_stream():
@@ -542,33 +510,6 @@ def delete_resume(resume_id):
         return jsonify({"message": "Resume deleted successfully"})
     except Exception as e:
         return jsonify({"error": f"Failed to delete resume: {str(e)}"}), 500
-
-
-@app.route("/download_resume/<resume_id>", methods=["GET"])
-def download_resume(resume_id):
-    try:
-        # Step 1: Look up resume document to get file_id
-        resume_doc = resumes_collection.find_one({"_id": ObjectId(resume_id)})
-        if not resume_doc or "file_id" not in resume_doc:
-            return {"error": "Resume not found or missing file_id"}, 404
-
-        file_id = resume_doc["file_id"]
-
-        # Step 2: Use GridFS to get the file
-        file_obj = fs.get(file_id)
-
-        # Step 3: Send file
-        return send_file(
-            io.BytesIO(file_obj.read()),
-            mimetype="application/pdf",
-            as_attachment=True,
-            download_name=file_obj.filename 
-        )
-
-    except gridfs.errors.NoFile:
-        return {"error": "File not found in GridFS"}, 404
-    except Exception as e:
-        return {"error": f"Failed to download file: {str(e)}"}, 500
 
 
 @app.errorhandler(404)

@@ -146,8 +146,8 @@ const Styles = {
       borderRadius: 8,
       border: "none",
       cursor: "pointer",
-      backgroundColor: "#3498db",
-      color: "#fff",
+      background: "linear-gradient(to right,rgb(141, 143, 224),rgb(204, 163, 245))",
+      color: "black",
       fontSize: 16,
     },
     transcriptBox: {

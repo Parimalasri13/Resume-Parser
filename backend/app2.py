@@ -129,7 +129,128 @@
 
 
 
+# from flask import Flask, request, jsonify
+# from pymongo import MongoClient
+# from sentence_transformers import SentenceTransformer
+# import faiss
+# import requests
+# import json
+
+# # === Initialize Flask ===
+# app = Flask(__name__)
+
+# # === Global Variables (Load once) ===
+# MONGO_URI = "mongodb+srv://parimala:Parimala@cluster0.nigrjnx.mongodb.net/resume_db?retryWrites=true&w=majority&appName=Cluster0"
+# DB_NAME = "resume_db"
+# COLLECTION_NAME = "resumes"
+# API_KEY = "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"
+# GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+
+# parsed_data = []
+# faiss_index = None
+# texts = []
+# model = None
+
+# # === Functions ===
+# def load_parsed_data_from_mongo():
+#     client = MongoClient(MONGO_URI)
+#     collection = client[DB_NAME][COLLECTION_NAME]
+#     documents = list(collection.find({"processed": True}))
+#     return [doc.get("parsed_data") for doc in documents if doc.get("parsed_data")]
+
+# def index_resumes_with_faiss(parsed_data, model_name="all-MiniLM-L6-v2"):
+#     model = SentenceTransformer(model_name)
+#     texts = [json.dumps(resume, indent=2) for resume in parsed_data]
+#     embeddings = model.encode(texts, convert_to_numpy=True)
+#     index = faiss.IndexFlatL2(embeddings.shape[1])
+#     index.add(embeddings)
+#     return index, texts, model
+
+# def retrieve_top_k_chunks(query, model, index, texts, k=4):
+#     query_embedding = model.encode([query], convert_to_numpy=True)
+#     distances, indices = index.search(query_embedding, k)
+#     return [texts[i] for i in indices[0]]
+
+# def build_prompt(chunks, user_query):
+#     return f"""You are a resume analysis assistant. Use the following candidate data to answer the question.
+
+# Candidate Data:
+# {chunks}
+
+# Question: {user_query}
+# Answer:"""
+
+# def query_llama(prompt):
+#     headers = {
+#         "Authorization": f"Bearer {API_KEY}",
+#         "Content-Type": "application/json"
+#     }
+#     payload = {
+#         "model": "llama3-70b-8192",
+#         "messages": [
+#             {"role": "system", "content": "You are a helpful assistant that understands JSON resume data."},
+#             {"role": "user", "content": prompt}
+#         ],
+#         "temperature": 0.2
+#     }
+#     response = requests.post(GROQ_API_URL, headers=headers, json=payload)
+#     response.raise_for_status()
+#     return response.json()["choices"][0]["message"]["content"]
+
+# def is_global_query(query):
+#     keywords = ["how many", "total", "count", "list all", "summary", "give me all"]
+#     return any(k in query.lower() for k in keywords)
+
+# # === Load on Startup ===
+# @app.before_first_request
+# def initialize():
+#     global parsed_data, faiss_index, texts, model
+#     print("📥 Loading resumes...")
+#     parsed_data = load_parsed_data_from_mongo()
+#     print("🔍 Indexing resumes...")
+#     faiss_index, texts, model = index_resumes_with_faiss(parsed_data)
+
+# # === Flask Route ===
+# @app.route("/query", methods=["POST"])
+# def query_resume():
+#     data = request.json
+#     user_query = data.get("query", "")
+
+#     if not user_query.strip():
+#         return jsonify({"error": "Query is required"}), 400
+
+#     try:
+#         if is_global_query(user_query):
+#             if "how many" in user_query.lower() and "candidates" in user_query.lower():
+#                 return jsonify({"response": f"There are {len(parsed_data)} candidates in the database."})
+
+#             elif "list all" in user_query.lower() and "names" in user_query.lower():
+#                 names = [res.get("name", "Unknown") for res in parsed_data]
+#                 return jsonify({"response": names})
+
+#             elif "summary" in user_query.lower():
+#                 summary_data = "\n\n".join([json.dumps(r, indent=2) for r in parsed_data[:5]])
+#                 prompt = build_prompt(summary_data, user_query)
+#                 response = query_llama(prompt)
+#                 return jsonify({"response": response})
+
+#         # Fallback: RAG
+#         top_chunks = retrieve_top_k_chunks(user_query, model, faiss_index, texts)
+#         prompt = build_prompt("\n\n".join(top_chunks), user_query)
+#         response = query_llama(prompt)
+#         return jsonify({"response": response})
+
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
+
+# # === Run Flask ===
+# if __name__ == "__main__":
+#     app.run(debug=True)
+
+
+
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from pymongo import MongoClient
 from sentence_transformers import SentenceTransformer
 import faiss
@@ -138,34 +259,32 @@ import json
 
 # === Initialize Flask ===
 app = Flask(__name__)
+CORS(app)  # Enable CORS so frontend (localhost:3000) can call this API
 
-# === Global Variables (Load once) ===
+# === Global Configs ===
 MONGO_URI = "mongodb+srv://parimala:Parimala@cluster0.nigrjnx.mongodb.net/resume_db?retryWrites=true&w=majority&appName=Cluster0"
-DB_NAME = "resume_db"
+DATABASE_NAME = "resume_db"
 COLLECTION_NAME = "resumes"
 API_KEY = "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"
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-parsed_data = []
-faiss_index = None
-texts = []
-model = None
+# === Load Everything on Startup ===
+print("📥 Connecting to MongoDB...")
+client = MongoClient(MONGO_URI)
+collection = client[DATABASE_NAME][COLLECTION_NAME]
+documents = list(collection.find({"processed": True}))
+parsed_data = [doc.get("parsed_data") for doc in documents if doc.get("parsed_data")]
+print(f"✅ Loaded {len(parsed_data)} processed resumes")
 
-# === Functions ===
-def load_parsed_data_from_mongo():
-    client = MongoClient(MONGO_URI)
-    collection = client[DB_NAME][COLLECTION_NAME]
-    documents = list(collection.find({"processed": True}))
-    return [doc.get("parsed_data") for doc in documents if doc.get("parsed_data")]
+print("🔍 Creating FAISS index...")
+model = SentenceTransformer("all-MiniLM-L6-v2")
+texts = [json.dumps(resume, indent=2) for resume in parsed_data]
+embeddings = model.encode(texts, convert_to_numpy=True)
+faiss_index = faiss.IndexFlatL2(embeddings.shape[1])
+faiss_index.add(embeddings)
+print("✅ FAISS index ready")
 
-def index_resumes_with_faiss(parsed_data, model_name="all-MiniLM-L6-v2"):
-    model = SentenceTransformer(model_name)
-    texts = [json.dumps(resume, indent=2) for resume in parsed_data]
-    embeddings = model.encode(texts, convert_to_numpy=True)
-    index = faiss.IndexFlatL2(embeddings.shape[1])
-    index.add(embeddings)
-    return index, texts, model
-
+# === Utility Functions ===
 def retrieve_top_k_chunks(query, model, index, texts, k=4):
     query_embedding = model.encode([query], convert_to_numpy=True)
     distances, indices = index.search(query_embedding, k)
@@ -201,16 +320,7 @@ def is_global_query(query):
     keywords = ["how many", "total", "count", "list all", "summary", "give me all"]
     return any(k in query.lower() for k in keywords)
 
-# === Load on Startup ===
-@app.before_first_request
-def initialize():
-    global parsed_data, faiss_index, texts, model
-    print("📥 Loading resumes...")
-    parsed_data = load_parsed_data_from_mongo()
-    print("🔍 Indexing resumes...")
-    faiss_index, texts, model = index_resumes_with_faiss(parsed_data)
-
-# === Flask Route ===
+# === API Endpoint ===
 @app.route("/query", methods=["POST"])
 def query_resume():
     data = request.json
@@ -234,7 +344,7 @@ def query_resume():
                 response = query_llama(prompt)
                 return jsonify({"response": response})
 
-        # Fallback: RAG
+        # Fallback: use RAG
         top_chunks = retrieve_top_k_chunks(user_query, model, faiss_index, texts)
         prompt = build_prompt("\n\n".join(top_chunks), user_query)
         response = query_llama(prompt)
@@ -243,6 +353,6 @@ def query_resume():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# === Run Flask ===
+# === Run Server ===
 if __name__ == "__main__":
     app.run(debug=True)
