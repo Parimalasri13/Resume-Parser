@@ -387,7 +387,6 @@ const fetchResumeCount = async () => {
     <div style={styles.container}>
       <header style={styles.header}>
         <div>
-          {/* <h1 style={{ fontSize: "24px", fontWeight: "bold", color: "#1e40af" }}>HR Portal</h1> */}
           <p style={styles.cardText}>Intelligent Candidate Management</p>
         </div>
       </header>
@@ -540,8 +539,8 @@ const fetchResumeCount = async () => {
             </button>
           </div>
           <div style={styles.transcriptBox}>
-            <h4>Live Transcript:</h4>
-            <p>{transcript || "Waiting for input..."}</p>
+            {/* <p style={{"margin":"11px"}}>Live Transcript:</p> */}
+            <p style={{"margin":"11px"}}>{transcript || "Waiting for input ..."}</p>
           </div>
         </>
       )}
