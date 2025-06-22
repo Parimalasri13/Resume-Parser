@@ -712,15 +712,6 @@ const fetchResumeCount = async () => {
           <tr key={idx} style={idx % 2 === 0 ? styles.tableRowEven : styles.tableRowOdd}>
             <td style={styles.filenameCell}>
               {row.filename}
-              {row.resume_id && (
-                <button
-                  onClick={() => handleResumeDownload(row.resume_id, row.filename)}
-                  style={styles.downloadButton}
-                  title="Download Resume"
-                >
-                  <FaDownload size={18} />
-                </button>
-              )}
             </td>
             <td style={styles.scoreCell}>
               <div style={styles.scoreBarWrapper}>
