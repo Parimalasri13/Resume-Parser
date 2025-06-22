@@ -29,7 +29,7 @@ const Navbar = () => {
         borderBottom: "1px solid #e5e7eb",
       }}
     >
-      <h2 style={{ color: "#1e40af", margin: 0, fontSize: "20px" }}>HR Portal</h2>
+      <h2 style={{ color: "#1e40af", margin: 0, fontSize: "24px" }}>HR Portal</h2>
       <div>
         {/* <Link to="/home" style={linkStyle("/home")}>Home</Link> */}
         {/* <Link to="/upload-resume" style={linkStyle("/upload-resume")}>Upload Resume</Link> */}
