@@ -21,6 +21,8 @@ from bson import ObjectId
 import gridfs
 from flask import Response
 import threading
+from flask import send_file, Response
+import io
 
 
 
@@ -427,7 +429,31 @@ def upload_resumes():
     except Exception as e:
         return jsonify({"error": f"Upload failed: {str(e)}"}), 500
 
+@app.route("/download_resume/<resume_id>", methods=["GET"])
+def download_resume(resume_id):
+    try:
+        # Step 1: Look up resume document to get file_id
+        resume_doc = resumes_collection.find_one({"_id": ObjectId(resume_id)})
+        if not resume_doc or "file_id" not in resume_doc:
+            return {"error": "Resume not found or missing file_id"}, 404
 
+        file_id = resume_doc["file_id"]
+
+        # Step 2: Use GridFS to get the file
+        file_obj = fs.get(file_id)
+
+        # Step 3: Send file
+        return send_file(
+            io.BytesIO(file_obj.read()),
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name=file_obj.filename 
+        )
+
+    except gridfs.errors.NoFile:
+        return {"error": "File not found in GridFS"}, 404
+    except Exception as e:
+        return {"error": f"Failed to download file: {str(e)}"}, 500
 @app.route('/get_resumes', methods=['GET'])
 def get_resumes():
     """Get list of all stored resumes"""
