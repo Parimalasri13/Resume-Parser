@@ -9,7 +9,8 @@ import "react-toastify/dist/ReactToastify.css";
 const ListJobDescriptionResults = () => {
   const [rankings, setRankings] = useState([]);
   const [expandedIndex, setExpandedIndex] = useState(null);
-  const [expandedJDIndex, setExpandedJDIndex] = useState(null);
+  const [expandedJDIndex, setExpandedJDIndex] = useState(null); // For "Read more"
+  const [loading, setLoading] = useState(true);
   const BASE_URL = process.env.REACT_APP_SERVER_URL;
 
   useEffect(() => {
@@ -19,7 +20,9 @@ const ListJobDescriptionResults = () => {
         setRankings(res.data);
       } catch (err) {
         console.error("Failed to fetch rankings", err);
-        toast.error("Failed to fetch JD results.");
+        toast.error(`Failed to fetch JD results. ${err}`);
+      } finally {
+        setLoading(false); // stop loader
       }
     };
     fetchRankings();
@@ -33,7 +36,7 @@ const ListJobDescriptionResults = () => {
       fileDownload(res.data, filename);
     } catch (err) {
       console.error("Download failed", err);
-      toast.error("Failed to download resume.");
+      toast.error(`Failed to download resume. ${err}`);
     }
   };
 
@@ -44,6 +47,43 @@ const ListJobDescriptionResults = () => {
   const toggleJD = (index) => {
     setExpandedJDIndex((prev) => (prev === index ? null : index));
   };
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          height: "100vh",
+          display: "flex",
+          flexDirection: "column", // stack vertically
+          justifyContent: "center",
+          alignItems: "center",
+          background: "#0f172a",
+          color: "#9ca3af",
+        }}
+      >
+        <div
+          className="spinner"
+          style={{
+            width: 48,
+            height: 48,
+            border: "5px solid #d1d5db",
+            borderTop: "5px solid #1e40af",
+            borderRadius: "50%",
+            animation: "spin 1s linear infinite",
+            marginBottom: 12, // spacing below spinner
+          }}
+        />
+        <p style={{ fontSize: 18 }}>Fetching all the job description results ...</p>
+    
+        <style>{`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );    
+  }
 
   return (
     <div style={{ padding: 24, backgroundColor: "#0f172a", color: "#fff", minHeight: "100vh" }}>

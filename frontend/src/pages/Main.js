@@ -4,8 +4,7 @@ import React, { useState, useRef, useMemo, useEffect } from "react";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import { Typewriter } from "react-simple-typewriter";
-import { FiDownload } from "react-icons/fi"; 
-import { FaDownload, FaTrash } from "react-icons/fa";// install react-icons if not already
+import { FaDownload } from "react-icons/fa";// install react-icons if not already
 import fileDownload from "js-file-download"; // install js-file-download if not already
 import "react-toastify/dist/ReactToastify.css";
 import styles from "../components/Styles";
@@ -385,12 +384,6 @@ const fetchResumeCount = async () => {
   return (
     
     <div style={styles.container}>
-      <header style={styles.header}>
-        <div>
-          {/* <h1 style={{ fontSize: "24px", fontWeight: "bold", color: "#1e40af" }}>HR Portal</h1> */}
-          <p style={styles.cardText}>Intelligent Candidate Management</p>
-        </div>
-      </header>
 
       <div style={styles.cardGrid}>
         <Card>
@@ -426,9 +419,10 @@ const fetchResumeCount = async () => {
                 fontSize: "24px",
                 fontWeight: 600,
                 color: "#fff",
-                textAlign: "center",
+                textAlign: "left",
                 marginBottom: "4px",
-                outline:"none"
+                outline:"none",
+                width:"65px"
               }}
             />
             <p style={styles.smallNote}>Job relevance</p>
@@ -484,7 +478,7 @@ const fetchResumeCount = async () => {
         </div>
       </div>
       {/* Show toast notifications */}
-      <ToastContainer position="top-right" autoClose={3000} />
+      <ToastContainer position="top-right" autoClose={3000} theme="dark" />
 
 
 
@@ -541,8 +535,8 @@ const fetchResumeCount = async () => {
             </button>
           </div>
           <div style={styles.transcriptBox}>
-            <h4>Live Transcript:</h4>
-            <p>{transcript || "Waiting for input..."}</p>
+            {/* <p style={{"margin":"11px"}}>Live Transcript:</p> */}
+            <p style={{"margin":"11px"}}>{transcript || "Waiting for input ..."}</p>
           </div>
         </>
       )}
@@ -563,7 +557,6 @@ const fetchResumeCount = async () => {
 
     <div style={
       {
-        border: "1px solid #64748b",
         background: "#1e293b",
         borderRadius: "12px",
         boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
@@ -693,7 +686,7 @@ const fetchResumeCount = async () => {
 
 
     {/* Table */}    
-<div style={styles.jobSection}>
+<div style={styles.tableSection}>
   <h3 style={styles.resumeHeading}>Processed Resume Results</h3>
   {tableError && <p style={styles.errorText}>{tableError}</p>}
   <div style={styles.tableWrapper}>
@@ -741,7 +734,7 @@ const fetchResumeCount = async () => {
                   style={styles.downloadButton}
                   title="Download Resume"
                 >
-                  <FiDownload size={18} />
+                  <FaDownload size={18} />
                 </button>
               )}
             </td>

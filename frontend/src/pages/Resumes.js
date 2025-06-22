@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useMemo } from "react";
 import axios from "axios";
 import { FaDownload, FaTrash } from "react-icons/fa";
@@ -9,6 +8,7 @@ import "react-toastify/dist/ReactToastify.css";
 const ListResumes = () => {
   const [resumes, setResumes] = useState([]);
   const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
 
   const BASE_URL = process.env.REACT_APP_SERVER_URL;
   const PAGE_SIZE = 5;
@@ -17,15 +17,13 @@ const ListResumes = () => {
     try {
       const response = await axios.get(`${BASE_URL}/get_resumes`);
       const data = response.data.resumes;
-      if (Array.isArray(data)) {
-        setResumes(data);
-      } else {
-        console.warn("Unexpected response:", data);
-        setResumes([]);
-      }
+      setResumes(data);
     } catch (err) {
+      console.error("Error fetching resumes:", err);
       toast.error(`Error fetching resumes: ${err}`);
-      setResumes([]);
+      setResumes([]); // fallback
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -51,7 +49,7 @@ const ListResumes = () => {
       fileDownload(response.data, filename);
     } catch (err) {
       console.error("Download failed", err);
-      toast.error("Failed to download resume.");
+      toast.error(`Failed to download resume.${err}`);
     }
   };
 
@@ -62,9 +60,46 @@ const ListResumes = () => {
 
   const totalPages = Math.ceil(resumes.length / PAGE_SIZE);
 
+  if (loading) {
+    return (
+      <div
+        style={{
+          height: "100vh",
+          display: "flex",
+          flexDirection: "column", // stack vertically
+          justifyContent: "center",
+          alignItems: "center",
+          background: "#0f172a",
+          color: "#9ca3af",
+        }}
+      >
+        <div
+          className="spinner"
+          style={{
+            width: 48,
+            height: 48,
+            border: "5px solid #d1d5db",
+            borderTop: "5px solid #1e40af",
+            borderRadius: "50%",
+            animation: "spin 1s linear infinite",
+            marginBottom: 12, // spacing below spinner
+          }}
+        />
+        <p style={{ fontSize: 18 }}>Fetching all the resumes ...</p>
+    
+        <style>{`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );    
+  }
+
   return (
     <div style={styles.container}>
-      <ToastContainer position="top-right" autoClose={3000} />
+      <ToastContainer position="top-right" autoClose={3000} theme="dark" />
       <h2 style={styles.title}>📁 All Resumes</h2>
       <table style={styles.table}>
         <thead>

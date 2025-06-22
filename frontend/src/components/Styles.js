@@ -167,12 +167,11 @@ const Styles = {
     borderRadius: 8,
     color: "#e2e8f0",
   },
-   jobSection: {
+  tableSection: {
     backgroundColor: "#1e293b",
     borderRadius: 12,
-    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.2)",
-    padding: 24,
-    marginBottom: 32,
+    padding: "24px auto",
+    marginBottom: "50px",
     color: "#e2e8f0",
   },
   jobHeading: {
@@ -319,7 +318,7 @@ csvDownloadButton: {
   cursor: "pointer",
 },
 filterSortContainer: {
-  margin: 24,
+  margin: "24px auto",
   display: "flex",
   gap: 16,
   alignItems: "center",
@@ -386,14 +385,6 @@ errorText: {
 
 tableWrapper: {
   overflowX: "auto",
-},
-
-table: {
-  width: "100%",
-  borderCollapse: "separate",
-  borderSpacing: 0,
-  overflow: "hidden",
-  boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
 },
 
 tableHead: {
