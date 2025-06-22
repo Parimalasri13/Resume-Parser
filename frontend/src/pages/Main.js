@@ -420,11 +420,12 @@ const fetchResumeCount = async () => {
               onChange={(e) => setMatchRate(Number(e.target.value))}
               style={{
                 padding: "8px",
-                border: "1px solid #d1d5db",
+                background: "#1e293b",
+                border: "1px solidrgb(15, 16, 16)",
                 borderRadius: "6px",
                 fontSize: "24px",
                 fontWeight: 600,
-                color: "#111827",
+                color: "#fff",
                 textAlign: "center",
                 marginBottom: "4px",
                 outline:"none"
