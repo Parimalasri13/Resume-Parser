@@ -5,13 +5,13 @@ const Navbar = () => {
   const location = useLocation();
 
   const linkStyle = (path) => ({
-    color: location.pathname === path ? "#ffffff" : "#6b7280",
+    color: location.pathname === path ? "#ffffff" : "#9ca3af",
     textDecoration: "none",
     padding: "10px 16px",
     margin: "0 4px",
     borderRadius: "8px",
-    backgroundColor: location.pathname === path ? "#1e40af" : "transparent",
-    transition: "background-color 0.3s ease",
+    backgroundColor: location.pathname === path ? "#1e3a8a" : "transparent",
+    transition: "all 0.3s ease",
     fontWeight: 500,
     fontSize: "14px",
   });
@@ -19,20 +19,18 @@ const Navbar = () => {
   return (
     <nav
       style={{
-        backgroundColor: "#ffffff",
+        backgroundColor: "#0f172a", // dark navy
         padding: "16px 32px",
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
         fontFamily: "Segoe UI, sans-serif",
-        boxShadow: "0 2px 6px rgba(0, 0, 0, 0.05)",
-        borderBottom: "1px solid #e5e7eb",
+        boxShadow: "0 2px 6px rgba(0, 0, 0, 0.4)",
+        borderBottom: "1px solid #1e293b",
       }}
     >
-      <h2 style={{ color: "#1e40af", margin: 0, fontSize: "20px" }}>HR Portal</h2>
+      <h2 style={{ color: "#93c5fd", margin: 0, fontSize: "20px" }}>HR Portal</h2>
       <div>
-        {/* <Link to="/home" style={linkStyle("/home")}>Home</Link> */}
-        {/* <Link to="/upload-resume" style={linkStyle("/upload-resume")}>Upload Resume</Link> */}
         <Link to="/" style={linkStyle("/")}>Dashboard</Link>
         <Link to="/resumes" style={linkStyle("/resumes")}>Resumes</Link>
         <Link to='/results' style={linkStyle('/results')}>Results</Link>
