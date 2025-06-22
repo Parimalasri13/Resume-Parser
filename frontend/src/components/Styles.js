@@ -298,12 +298,12 @@ searchInput: {
   borderRadius: "8px",
   fontSize: "14px",
   minWidth: "200px",
-  border: "none",
+  border: "1px solid #64748b",
   background: "#1e293b",
   color: "white",
   fontWeight: 600,
   cursor: "pointer",
-  boxShadow: "0 1px 3px white",
+ 
   outline: "none",
 },
 
@@ -346,32 +346,33 @@ label: {
   color: "#e2e8f0", // light text for dark background
   fontWeight: 500,
   
+  
+  
 },
 
 input: {
   width: 60,
   padding: "6px 12px",
   borderRadius: 6,
-  border: "none",
+  border: "1px solid #64748b",
   background: "#1e293b",
   color: "white",
   fontWeight: 600,
   cursor: "pointer",
   fontSize: "14px",
-   boxShadow: "0 0.5px 3px white",
+  
   outline: "none",
 },
 
 select: {
   padding: "6px 12px",
   borderRadius: 6,
-  border: "none",
   background: "#1e293b",
   color: "white",
   fontWeight: 600,
   cursor: "pointer",
   fontSize: "14px",
-  boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)",
+  border: "1px solid #64748b",
   outline: "none",
 },
 resumeHeading: {
