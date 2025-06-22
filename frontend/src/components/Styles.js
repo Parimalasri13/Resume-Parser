@@ -397,7 +397,7 @@ table: {
 },
 
 tableHead: {
-  backgroundColor: "#1e3a8a", // deep blue
+  backgroundColor: "#334155", // deep blue
   color: "#fff",
 },
 
