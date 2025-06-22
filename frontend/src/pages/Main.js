@@ -36,12 +36,13 @@ const HRPortalDashboard = () => {
 
   // Pagination
   const PAGE_SIZE = 5;
-  const matchRate = 75;
+  // const matchRate = 75;
   const [page, setPage] = useState(1);
 
   const [resumeCount, setResumeCount] = useState();
   const [updatedCount, setUpdatedCount] = useState(0);
   const [shortListCount,setShortListCount] = useState(0);
+  const [matchRate, setMatchRate] = useState(75);
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
 
@@ -157,6 +158,10 @@ const fetchResumeCount = async () => {
   fetchResumeCount();
 }, []);
 
+  useEffect(() => {
+    setShortListCount(tableData.filter(r => r.score >= matchRate).length);
+  },[tableData, matchRate]);
+
 
   const handleFileChange = (e) => {
     setSelectedFiles([...e.target.files]);
@@ -201,7 +206,6 @@ const fetchResumeCount = async () => {
           toast.success(`${count} resumes processed!`);
           if (results?.length) {
             setTableData(results);
-            setShortListCount(results.filter(r => r.score >= matchRate).length);
             setShowTable(true);
           } else {
             setTableError("No results found.");
@@ -372,7 +376,24 @@ const fetchResumeCount = async () => {
         <Card>
           <CardContent>
             <p style={styles.cardText}>Match Rate</p>
-            <p style={styles.cardValue}>{matchRate}%</p>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={matchRate}
+              onChange={(e) => setMatchRate(Number(e.target.value))}
+              style={{
+                padding: "8px",
+                border: "1px solid #d1d5db",
+                borderRadius: "6px",
+                fontSize: "24px",
+                fontWeight: 600,
+                color: "#111827",
+                textAlign: "center",
+                marginBottom: "4px",
+                outline:"none"
+              }}
+            />
             <p style={styles.smallNote}>Job relevance</p>
           </CardContent>
         </Card>
@@ -380,7 +401,7 @@ const fetchResumeCount = async () => {
 
       <div style={styles.uploadSection}>
         <h2 style={{ ...styles.cardValue, color: "#1e40af", fontSize: "18px" }}>
-          Upload Resumes
+        📝 Upload Resumes
         </h2>
         <p style={styles.cardText}>
           Upload PDF or DOC files to extract candidate information
@@ -496,7 +517,7 @@ const fetchResumeCount = async () => {
             ...styles.buttonGradient,
             cursor: loading ? "not-allowed" : "pointer",
             opacity: loading ? 0.5 : 1,
-            minHeight: 50,
+            // minHeight: 50,
           }}
         >
           🔍 Shortlist Candidates
