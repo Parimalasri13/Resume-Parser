@@ -5,9 +5,14 @@ import time
 from typing import Dict, List, Optional
 from datetime import datetime
 
+import requests
+from sentence_transformers import SentenceTransformer
+import faiss
+import numpy as np
+import tiktoken
 import fitz  # PyMuPDF
 import pandas as pd
-import requests
+
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -37,6 +42,8 @@ GROQ_API_URL = os.getenv("GROQ_API_URL")
 API_KEY = os.getenv("API_KEY")
 MONGO_URI = os.getenv("MONGO_URI")
 DATABASE_NAME = os.getenv("DATABASE_NAME")
+COLLECTION_NAME = "resumes"
+DB_NAME = "resume_db"
 
 HEADERS = {
     "Authorization": f"Bearer {API_KEY}",
@@ -54,6 +61,114 @@ try:
 except Exception as e:
     print(f"Failed to connect to MongoDB: {e}")
     client = None
+
+
+parsed_data = []
+faiss_index = None
+texts = []
+model = None
+
+def load_parsed_data_from_mongo():
+    client = MongoClient(MONGO_URI)
+    collection = client[DB_NAME][COLLECTION_NAME]
+    documents = list(collection.find({"processed": True}))
+    return [doc.get("parsed_data") for doc in documents if doc.get("parsed_data")]
+
+def index_resumes_with_faiss(parsed_data, model_name="all-MiniLM-L6-v2"):
+    model = SentenceTransformer(model_name)
+    texts = [json.dumps(resume, indent=2) for resume in parsed_data]
+    embeddings = model.encode(texts, convert_to_numpy=True)
+    index = faiss.IndexFlatL2(embeddings.shape[1])
+    index.add(embeddings)
+    return index, texts, model
+
+def retrieve_top_k_chunks(query, model, index, texts, k=4):
+    query_embedding = model.encode([query], convert_to_numpy=True)
+    distances, indices = index.search(query_embedding, k)
+    return [texts[i] for i in indices[0]]
+
+def build_prompt(chunks, user_query):
+    return f"""You are a resume analysis assistant. Use the following candidate data to answer the question.
+
+Candidate Data:
+{chunks}
+
+Question: {user_query}
+Answer:"""
+
+def query_llama(prompt):
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": "llama3-70b-8192",
+        "messages": [
+            {"role": "system", "content": "You are a helpful assistant that understands JSON resume data."},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.2
+    }
+    response = requests.post(GROQ_API_URL, headers=headers, json=payload)
+    response.raise_for_status()
+    return response.json()["choices"][0]["message"]["content"]
+
+def is_global_query(query):
+    keywords = ["how many", "total", "count", "list all", "summary", "give me all"]
+    return any(k in query.lower() for k in keywords)
+
+# === Load on Startup ===
+
+def init_data():
+    global parsed_data, faiss_index, texts, model
+    print("📥 Connecting to MongoDB...")
+    client = MongoClient(MONGO_URI)
+    collection = client[DB_NAME][COLLECTION_NAME]
+    documents = list(collection.find({"processed": True}))
+    parsed_data = [doc.get("parsed_data") for doc in documents if doc.get("parsed_data")]
+
+    print("🔍 Indexing resumes with FAISS...")
+    model = SentenceTransformer("all-MiniLM-L6-v2")
+    texts = [json.dumps(resume, indent=2) for resume in parsed_data]
+    embeddings = model.encode(texts, convert_to_numpy=True)
+    faiss_index = faiss.IndexFlatL2(embeddings.shape[1])
+    faiss_index.add(embeddings)
+
+init_data()  # ✅ Call at top-level
+
+
+# === Flask Route ===
+@app.route("/query", methods=["POST"])
+def query_resume():
+    data = request.json
+    user_query = data.get("query", "")
+
+    if not user_query.strip():
+        return jsonify({"error": "Query is required"}), 400
+
+    try:
+        if is_global_query(user_query):
+            if "how many" in user_query.lower() and "candidates" in user_query.lower():
+                return jsonify({"response": f"There are {len(parsed_data)} candidates in the database."})
+
+            elif "list all" in user_query.lower() and "names" in user_query.lower():
+                names = [res.get("name", "Unknown") for res in parsed_data]
+                return jsonify({"response": names})
+
+            elif "summary" in user_query.lower():
+                summary_data = "\n\n".join([json.dumps(r, indent=2) for r in parsed_data[:5]])
+                prompt = build_prompt(summary_data, user_query)
+                response = query_llama(prompt)
+                return jsonify({"response": response})
+
+        # Fallback: RAG
+        top_chunks = retrieve_top_k_chunks(user_query, model, faiss_index, texts)
+        prompt = build_prompt("\n\n".join(top_chunks), user_query)
+        response = query_llama(prompt)
+        return jsonify({"response": response})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 def post_with_retries(url: str, headers: Dict, payload: Dict) -> requests.Response:
